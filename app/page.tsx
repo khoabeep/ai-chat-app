@@ -24,7 +24,7 @@ type Conversation = {
 };
 
 type ExpertiseLevel = 'Newbie' | 'Intermediate' | 'Expert';
-type ModelId = 'gemini-2.5-flash' | 'gemini-2.0-flash';
+type ModelId = 'gemini-1.5-flash' | 'gemini-1.5-pro';
 
 const STORAGE_KEY = 'ai_chat_conversations';
 
@@ -80,7 +80,7 @@ export default function Home() {
     const [sidebarOpen, setSidebarOpen] = useState(true);
     const [darkMode, setDarkMode] = useState(false);
     const [level, setLevel] = useState<ExpertiseLevel>('Intermediate');
-    const [model, setModel] = useState<ModelId>('gemini-2.5-flash');
+    const [model, setModel] = useState<ModelId>('gemini-1.5-flash');
     const [isDebateMode, setIsDebateMode] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [attachment, setAttachment] = useState<Attachment | null>(null);
@@ -357,8 +357,8 @@ export default function Home() {
                             <option value="Expert">🧠 Chuyên sâu</option>
                         </select>
                         <select className={styles.modelSelect} value={model} onChange={e => setModel(e.target.value as ModelId)}>
-                            <option value="gemini-2.5-flash">⚡ 2.5 Flash</option>
-                            <option value="gemini-2.0-flash">🔥 2.0 Flash</option>
+                            <option value="gemini-1.5-flash">⚡ 1.5 Flash (Nhanh)</option>
+                            <option value="gemini-1.5-pro">🧠 1.5 Pro (Thông minh)</option>
                         </select>
                         <button className={styles.iconBtn} onClick={exportChat} title="Xuất chat">📤 Xuất</button>
                         <button className={styles.iconBtn} onClick={toggleDark} title="Đổi giao diện">

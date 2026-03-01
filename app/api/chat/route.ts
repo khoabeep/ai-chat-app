@@ -10,7 +10,7 @@ export async function POST(req: Request) {
             messages,
             expertiseLevel = 'Intermediate',
             isDebateMode = false,
-            model = 'gemini-2.5-flash',
+            model = 'gemini-1.5-flash',
             imageBase64 = null,
             imageMime = null,
             fileText = null,
