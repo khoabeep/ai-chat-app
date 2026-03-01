@@ -2,7 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-    title: 'AI Chat — Powered by Gemini',
+    title: 'AI Chat Bot — Powered by Nguyễn Vũ Đăng Khoa',
     description: 'Trợ lý AI thông minh, trả lời mọi câu hỏi của bạn',
 };
 
