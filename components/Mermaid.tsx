@@ -29,14 +29,26 @@ function loadMermaidFromCDN(): Promise<void> {
 
 // Wrap node labels containing special/Unicode characters in quotes
 function preprocessChart(chart: string): string {
-    // Wrap labels in [] or () that contain non-ASCII chars
     return chart
-        .replace(/\[([^\]"]+)\]/g, (match, label) => {
-            if (/[^\x00-\x7F]/.test(label)) return `["${label}"]`;
+        // Normalize line endings
+        .replace(/\r\n/g, '\n')
+        // Remove leading/trailing blank lines
+        .trim()
+        // Wrap [] node labels containing non-ASCII or special chars (but not already quoted)
+        .replace(/\[([^\]"\[]+)\]/g, (match, label) => {
+            if (/[^\x00-\x7F!-~\s]/.test(label) || /[(){}|<>]/.test(label)) {
+                return `["${label.replace(/"/g, "'")}"]`;
+            }
             return match;
         })
-        .replace(/\(([^)"]+)\)/g, (match, label) => {
-            if (/[^\x00-\x7F]/.test(label) && !match.startsWith('((')) return `("${label}")`;
+        // Wrap () node labels (skip double-parens circle nodes and already quoted)
+        .replace(/(?<!\()\(([^()"]+)\)(?!\))/g, (match, label) => {
+            if (/[^\x00-\x7F]/.test(label)) return `("${label.replace(/"/g, "'")}`;
+            return match;
+        })
+        // Wrap subgraph titles containing non-ASCII
+        .replace(/^(\s*subgraph\s+)([^[\n"]+)$/gm, (match, prefix, title) => {
+            if (/[^\x00-\x7F]/.test(title)) return `${prefix}"${title.trim().replace(/"/g, "'")}"`;
             return match;
         });
 }

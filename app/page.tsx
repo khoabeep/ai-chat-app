@@ -27,6 +27,8 @@ type ExpertiseLevel = 'Newbie' | 'Intermediate' | 'Expert';
 type ModelId = 'gemini-2.5-flash' | 'gemini-2.5-pro' | 'gemini-2.0-flash';
 
 const STORAGE_KEY = 'ai_chat_conversations';
+const MAX_INPUT_LENGTH = 4000;
+const THROTTLE_MS = 800;
 
 function loadConversations(): Conversation[] {
     try {
@@ -65,11 +67,33 @@ function parseMarkdown(text: string): string {
     return text.replace(/\n/g, '<br />');
 }
 
+function getErrorMessage(resp?: Response, err?: unknown): string {
+    if (!resp) {
+        if (err instanceof TypeError && (err as TypeError).message.includes('fetch')) {
+            return '🌐 Không có kết nối. Kiểm tra internet và thử lại!';
+        }
+        return '❌ Có lỗi xảy ra. Vui lòng thử lại!';
+    }
+    if (resp.status === 429) return '⏱️ Đã vượt giới hạn API. Vui lòng thử lại sau ít phút!';
+    if (resp.status === 503) return '🔧 Dịch vụ tạm thời không khả dụng. Thử lại sau!';
+    if (resp.status === 401 || resp.status === 403) return '🔑 API key không hợp lệ. Liên hệ quản trị viên!';
+    if (resp.status >= 500) return '💥 Lỗi máy chủ. Vui lòng thử lại!';
+    return '❌ Có lỗi xảy ra. Vui lòng thử lại!';
+}
+
 const SUGGESTIONS = [
-    { icon: '🌍', text: 'Giải thích biến đổi khí hậu', label: 'Giải thích biến đổi khí hậu là gì và tác động của nó' },
+    { icon: '🌍', text: 'Biến đổi khí hậu', label: 'Giải thích biến đổi khí hậu là gì và tác động của nó' },
     { icon: '💻', text: 'Viết code', label: 'Viết hàm Python đọc file CSV và tính trung bình cột' },
     { icon: '🧠', text: 'Tâm lý học', label: 'Tại sao con người hay trì hoãn công việc quan trọng?' },
     { icon: '📈', text: 'Đầu tư', label: 'Hướng dẫn đầu tư an toàn cho người mới bắt đầu' },
+];
+
+const PRESETS = [
+    { icon: '📚', label: 'Học tập', prompt: 'Giải thích khái niệm này một cách dễ hiểu: ' },
+    { icon: '💻', label: 'Code', prompt: 'Viết code để giải quyết bài toán: ' },
+    { icon: '🌐', label: 'Dịch thuật', prompt: 'Dịch sang tiếng Anh tự nhiên: ' },
+    { icon: '✍️', label: 'Sáng tạo', prompt: 'Viết một đoạn văn sáng tạo về chủ đề: ' },
+    { icon: '🔍', label: 'Phân tích', prompt: 'Phân tích ưu và nhược điểm của: ' },
 ];
 
 export default function Home() {
@@ -78,21 +102,34 @@ export default function Home() {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(true);
+    const [isMobile, setIsMobile] = useState(false);
     const [darkMode, setDarkMode] = useState(false);
     const [level, setLevel] = useState<ExpertiseLevel>('Intermediate');
     const [model, setModel] = useState<ModelId>('gemini-2.5-flash');
+    const [temperature, setTemperature] = useState(0.7);
     const [isDebateMode, setIsDebateMode] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
     const [attachment, setAttachment] = useState<Attachment | null>(null);
     const [markedReady, setMarkedReady] = useState(false);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const recognitionRef = useRef<any>(null);
+    const lastSentRef = useRef<number>(0);
+    const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const activeConv = conversations.find(c => c.id === activeId);
     const messages = activeConv?.messages || [];
+
+    // Detect mobile
+    useEffect(() => {
+        const check = () => setIsMobile(window.innerWidth <= 768);
+        check();
+        window.addEventListener('resize', check);
+        return () => window.removeEventListener('resize', check);
+    }, []);
 
     // Load data
     useEffect(() => {
@@ -101,22 +138,41 @@ export default function Home() {
         if (saved.length > 0) setActiveId(saved[0].id);
         const theme = localStorage.getItem('theme') || 'light';
         if (theme === 'dark') { setDarkMode(true); document.documentElement.setAttribute('data-theme', 'dark'); }
+        const savedTemp = localStorage.getItem('temperature');
+        if (savedTemp) setTemperature(parseFloat(savedTemp));
+        // On mobile, start with sidebar closed
+        if (window.innerWidth <= 768) setSidebarOpen(false);
         loadMarked().then(() => setMarkedReady(true));
     }, []);
 
     useEffect(() => {
-        if (markedReady) setMarkedReady(true); // trigger re-render after marked loads
+        if (markedReady) setMarkedReady(true);
     }, [markedReady]);
 
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isLoading]);
 
+    // Auto-clear error after 4s
+    const showError = (msg: string) => {
+        setErrorMsg(msg);
+        if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+        errorTimerRef.current = setTimeout(() => setErrorMsg(null), 4000);
+    };
+
     const toggleDark = () => {
         const next = !darkMode;
         setDarkMode(next);
         document.documentElement.setAttribute('data-theme', next ? 'dark' : 'light');
         localStorage.setItem('theme', next ? 'dark' : 'light');
+    };
+
+    const handleSidebarToggle = () => {
+        setSidebarOpen(p => !p);
+    };
+
+    const closeSidebarOnMobile = () => {
+        if (isMobile) setSidebarOpen(false);
     };
 
     const newChat = () => {
@@ -127,6 +183,7 @@ export default function Home() {
         setActiveId(conv.id);
         setInput('');
         setAttachment(null);
+        closeSidebarOnMobile();
     };
 
     const deleteConv = (id: string, e: React.MouseEvent) => {
@@ -146,6 +203,14 @@ export default function Home() {
     }, []);
 
     const handleSend = async (textToSend: string) => {
+        // Throttle: prevent sending too fast
+        const now = Date.now();
+        if (now - lastSentRef.current < THROTTLE_MS) return;
+        if (!textToSend.trim() && !attachment) return;
+        if (isLoading) return;
+
+        lastSentRef.current = now;
+
         let targetId = activeId;
 
         if (!targetId) {
@@ -156,9 +221,6 @@ export default function Home() {
             setActiveId(conv.id);
             targetId = conv.id;
         }
-
-        if (!textToSend.trim() && !attachment) return;
-        if (isLoading) return;
 
         const userMsg: Message = { role: 'user', content: textToSend, timestamp: Date.now(), attachment: attachment || undefined };
         const currentConv = conversations.find(c => c.id === targetId) || { messages: [] };
@@ -175,6 +237,7 @@ export default function Home() {
         setInput('');
         setAttachment(null);
         setIsLoading(true);
+        if (textareaRef.current) { textareaRef.current.style.height = 'auto'; }
 
         const aiMsg: Message = { role: 'assistant', content: '', timestamp: Date.now() };
         const messagesWithAI = [...newMessages, aiMsg];
@@ -185,6 +248,7 @@ export default function Home() {
             return updated;
         });
 
+        let lastResp: Response | undefined;
         try {
             const resp = await fetch('/api/chat', {
                 method: 'POST',
@@ -194,13 +258,19 @@ export default function Home() {
                     expertiseLevel: level,
                     isDebateMode,
                     model,
+                    temperature,
                     imageBase64: attachment?.base64 || null,
                     imageMime: attachment?.mimeType || null,
                     fileText: attachment?.fileText || null,
                 }),
             });
 
-            if (!resp.ok || !resp.body) throw new Error('API Error');
+            lastResp = resp;
+
+            if (!resp.ok || !resp.body) {
+                const errMsg = getErrorMessage(resp);
+                throw new Error(errMsg);
+            }
 
             const reader = resp.body.getReader();
             const decoder = new TextDecoder();
@@ -223,13 +293,15 @@ export default function Home() {
                 });
             }
 
-        } catch {
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : getErrorMessage(lastResp, err);
+            showError(msg);
             setConversations(prev => {
                 const updated = prev.map(c => {
                     if (c.id !== targetId) return c;
                     const msgs = c.messages.map((m, i) =>
                         i === c.messages.length - 1 && m.role === 'assistant'
-                            ? { ...m, content: 'Xin lỗi, có lỗi xảy ra. Vui lòng thử lại!' } : m);
+                            ? { ...m, content: msg } : m);
                     return { ...c, messages: msgs };
                 });
                 saveConversations(updated);
@@ -297,20 +369,53 @@ export default function Home() {
         if (ta) { ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 140) + 'px'; }
     };
 
-    const renderContent = (content: string) => {
-        if (content.includes('```mermaid')) {
-            return content.split(/```mermaid|```/).map((chunk, i) => {
-                if (i % 2 === 1) return <Mermaid key={i} chart={chunk.trim()} />;
-                const html = parseMarkdown(chunk);
-                return <div key={i} className={styles.markdownContent} dangerouslySetInnerHTML={{ __html: html }} />;
-            });
-        }
-        const html = parseMarkdown(content);
-        return <div className={styles.markdownContent} dangerouslySetInnerHTML={{ __html: html }} />;
+    const handlePreset = (prompt: string) => {
+        setInput(prompt);
+        textareaRef.current?.focus();
+        autoResize();
     };
+
+    const handleTempChange = (val: number) => {
+        setTemperature(val);
+        localStorage.setItem('temperature', String(val));
+    };
+
+    const renderContent = (content: string) => {
+        if (!content.includes('```mermaid')) {
+            const html = parseMarkdown(content);
+            return <div className={styles.markdownContent} dangerouslySetInnerHTML={{ __html: html }} />;
+        }
+        // Use precise regex to extract only mermaid blocks, leave other code blocks intact
+        const parts: React.ReactNode[] = [];
+        const regex = /```mermaid\n([\s\S]*?)```/g;
+        let lastIndex = 0;
+        let match;
+        let key = 0;
+        while ((match = regex.exec(content)) !== null) {
+            if (match.index > lastIndex) {
+                const html = parseMarkdown(content.slice(lastIndex, match.index));
+                parts.push(<div key={key++} className={styles.markdownContent} dangerouslySetInnerHTML={{ __html: html }} />);
+            }
+            parts.push(<Mermaid key={key++} chart={match[1].trim()} />);
+            lastIndex = match.index + match[0].length;
+        }
+        if (lastIndex < content.length) {
+            const html = parseMarkdown(content.slice(lastIndex));
+            parts.push(<div key={key++} className={styles.markdownContent} dangerouslySetInnerHTML={{ __html: html }} />);
+        }
+        return parts;
+    };
+
+    const charCount = input.length;
+    const showCharCounter = charCount > 3000;
 
     return (
         <div className={styles.appContainer}>
+            {/* ── Sidebar Backdrop (mobile) ── */}
+            {isMobile && sidebarOpen && (
+                <div className={styles.sidebarBackdrop} onClick={() => setSidebarOpen(false)} />
+            )}
+
             {/* ── Sidebar ── */}
             <aside className={`${styles.sidebar} ${!sidebarOpen ? styles.collapsed : ''}`}>
                 <div className={styles.sidebarHeader}>
@@ -327,7 +432,7 @@ export default function Home() {
                         <div
                             key={c.id}
                             className={`${styles.convItem} ${c.id === activeId ? styles.active : ''}`}
-                            onClick={() => setActiveId(c.id)}
+                            onClick={() => { setActiveId(c.id); closeSidebarOnMobile(); }}
                         >
                             <span className={styles.convTitle}>💬 {c.title || 'Cuộc trò chuyện mới'}</span>
                             <button className={styles.convDelete} onClick={e => deleteConv(c.id, e)} title="Xóa">✕</button>
@@ -341,7 +446,7 @@ export default function Home() {
                 {/* Header */}
                 <header className={styles.header}>
                     <div className={styles.headerLeft}>
-                        <button className={styles.menuBtn} onClick={() => setSidebarOpen(p => !p)} title="Sidebar">☰</button>
+                        <button className={styles.menuBtn} onClick={handleSidebarToggle} title="Sidebar">☰</button>
                         <div>
                             <div className={styles.headerTitle}>✨ AI Chat</div>
                             <div className={styles.headerSubtitle}>Powered by Gemini</div>
@@ -349,7 +454,7 @@ export default function Home() {
                     </div>
                     <div className={styles.headerRight}>
                         <button className={`${styles.iconBtn} ${isDebateMode ? styles.active : ''}`} onClick={() => setIsDebateMode(p => !p)}>
-                            ⚖️ Debate
+                            ⚖️<span className={styles.labelText}> Debate</span>
                         </button>
                         <select className={styles.levelSelect} value={level} onChange={e => setLevel(e.target.value as ExpertiseLevel)}>
                             <option value="Newbie">🎓 Đơn giản</option>
@@ -357,11 +462,27 @@ export default function Home() {
                             <option value="Expert">🧠 Chuyên sâu</option>
                         </select>
                         <select className={styles.modelSelect} value={model} onChange={e => setModel(e.target.value as ModelId)}>
-                            <option value="gemini-2.5-flash">⚡ 2.5 Flash (Nhanh)</option>
-                            <option value="gemini-2.5-pro">🧠 2.5 Pro (Thông minh)</option>
+                            <option value="gemini-2.5-flash">⚡ 2.5 Flash</option>
+                            <option value="gemini-2.5-pro">🧠 2.5 Pro</option>
                             <option value="gemini-2.0-flash">🔥 2.0 Flash</option>
                         </select>
-                        <button className={styles.iconBtn} onClick={exportChat} title="Xuất chat">📤 Xuất</button>
+                        {/* Temperature slider – hidden on mobile via CSS */}
+                        <div className={styles.tempControl} title={`Độ sáng tạo: ${temperature}`}>
+                            🌡️
+                            <input
+                                type="range"
+                                className={styles.tempSlider}
+                                min={0.1}
+                                max={1.0}
+                                step={0.1}
+                                value={temperature}
+                                onChange={e => handleTempChange(parseFloat(e.target.value))}
+                            />
+                            <span className={styles.tempValue}>{temperature.toFixed(1)}</span>
+                        </div>
+                        <button className={styles.iconBtn} onClick={exportChat} title="Xuất chat">
+                            📤<span className={styles.labelText}> Xuất</span>
+                        </button>
                         <button className={styles.iconBtn} onClick={toggleDark} title="Đổi giao diện">
                             {darkMode ? '☀️' : '🌙'}
                         </button>
@@ -369,7 +490,7 @@ export default function Home() {
                             await fetch('/api/auth', { method: 'DELETE' });
                             window.location.href = '/login';
                         }} title="Đăng xuất" style={{ color: '#ef4444', borderColor: '#fca5a5' }}>
-                            🚪 Thoát
+                            🚪<span className={styles.labelText}> Thoát</span>
                         </button>
                     </div>
                 </header>
@@ -435,6 +556,15 @@ export default function Home() {
 
                 {/* Input Area */}
                 <div className={styles.inputArea}>
+                    {/* Preset prompt chips */}
+                    <div className={styles.presetChips}>
+                        {PRESETS.map((p, i) => (
+                            <button key={i} className={styles.presetChip} onClick={() => handlePreset(p.prompt)}>
+                                {p.icon} {p.label}
+                            </button>
+                        ))}
+                    </div>
+
                     {attachment && (
                         <div className={styles.attachPreview}>
                             {attachment.isFile ? (
@@ -458,6 +588,7 @@ export default function Home() {
                             className={styles.textInput}
                             rows={1}
                             disabled={isLoading}
+                            maxLength={MAX_INPUT_LENGTH}
                         />
                         <div className={styles.inputActions}>
                             <input
@@ -471,11 +602,13 @@ export default function Home() {
                                 className={styles.inputIconBtn}
                                 onClick={() => fileInputRef.current?.click()}
                                 title="Đính kèm ảnh hoặc file"
+                                disabled={isLoading}
                             >📎</button>
                             <button
                                 className={`${styles.inputIconBtn} ${isRecording ? styles.recording : ''}`}
                                 onClick={handleVoice}
                                 title={isRecording ? 'Đang ghi âm... (click để dừng)' : 'Nhập bằng giọng nói'}
+                                disabled={isLoading}
                             >🎤</button>
                             <button
                                 className={styles.sendBtn}
@@ -485,8 +618,20 @@ export default function Home() {
                             >➤</button>
                         </div>
                     </div>
+                    {showCharCounter && (
+                        <div className={`${styles.charCounter} ${charCount > 3800 ? styles.danger : styles.warn}`}>
+                            {charCount}/{MAX_INPUT_LENGTH}
+                        </div>
+                    )}
                 </div>
             </div>
+
+            {/* ── Error Toast ── */}
+            {errorMsg && (
+                <div className={styles.errorToast} onClick={() => setErrorMsg(null)}>
+                    {errorMsg}
+                </div>
+            )}
         </div>
     );
 }
