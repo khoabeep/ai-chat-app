@@ -1,9 +1,7 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
 
-interface MermaidProps {
-    chart: string;
-}
+interface MermaidProps { chart: string; }
 
 let mermaidLoaded = false;
 
@@ -12,17 +10,35 @@ function loadMermaidFromCDN(): Promise<void> {
     return new Promise((resolve, reject) => {
         if (typeof window === 'undefined') return resolve();
         if ((window as any).mermaid) { mermaidLoaded = true; return resolve(); }
-
         const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js';
+        script.src = 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js';
         script.onload = () => {
-            (window as any).mermaid.initialize({ startOnLoad: false, theme: 'default' });
+            (window as any).mermaid.initialize({
+                startOnLoad: false,
+                theme: 'default',
+                securityLevel: 'loose',
+                fontFamily: 'Inter, sans-serif',
+            });
             mermaidLoaded = true;
             resolve();
         };
-        script.onerror = () => reject(new Error('Failed to load Mermaid from CDN'));
+        script.onerror = () => reject(new Error('Không tải được Mermaid'));
         document.head.appendChild(script);
     });
+}
+
+// Wrap node labels containing special/Unicode characters in quotes
+function preprocessChart(chart: string): string {
+    // Wrap labels in [] or () that contain non-ASCII chars
+    return chart
+        .replace(/\[([^\]"]+)\]/g, (match, label) => {
+            if (/[^\x00-\x7F]/.test(label)) return `["${label}"]`;
+            return match;
+        })
+        .replace(/\(([^)"]+)\)/g, (match, label) => {
+            if (/[^\x00-\x7F]/.test(label) && !match.startsWith('((')) return `("${label}")`;
+            return match;
+        });
 }
 
 export default function Mermaid({ chart }: MermaidProps) {
@@ -33,39 +49,37 @@ export default function Mermaid({ chart }: MermaidProps) {
     useEffect(() => {
         if (!chart || !containerRef.current) return;
         const id = `mermaid-${Math.random().toString(36).slice(2)}`;
-
         setIsRendering(true);
         setError(null);
 
         loadMermaidFromCDN()
             .then(() => {
                 const m = (window as any).mermaid;
-                return m.render(id, chart);
+                const processedChart = preprocessChart(chart.trim());
+                return m.render(id, processedChart);
             })
             .then(({ svg }: { svg: string }) => {
-                if (containerRef.current) {
-                    containerRef.current.innerHTML = svg;
-                }
+                if (containerRef.current) containerRef.current.innerHTML = svg;
                 setIsRendering(false);
             })
             .catch((err: Error) => {
-                setError('Không thể render sơ đồ: ' + err.message);
+                setError(err.message);
                 setIsRendering(false);
             });
     }, [chart]);
 
     if (error) {
         return (
-            <pre style={{
-                background: '#fef2f2',
-                color: '#dc2626',
-                padding: '0.75rem',
-                borderRadius: '8px',
-                fontSize: '0.8rem',
-                whiteSpace: 'pre-wrap'
-            }}>
-                {error}{'\n\n'}{chart}
-            </pre>
+            <div style={{ margin: '0.5rem 0' }}>
+                <details>
+                    <summary style={{ color: '#94a3b8', fontSize: '0.82rem', cursor: 'pointer', padding: '0.4rem 0' }}>
+                        ⚠️ Không thể vẽ sơ đồ — xem code
+                    </summary>
+                    <pre style={{ background: '#0f172a', color: '#e2e8f0', padding: '0.75rem', borderRadius: '8px', fontSize: '0.8rem', overflowX: 'auto', marginTop: '0.5rem' }}>
+                        {chart}
+                    </pre>
+                </details>
+            </div>
         );
     }
 
