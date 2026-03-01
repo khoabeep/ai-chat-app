@@ -1,0 +1,11 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/api/auth/route": "/api/auth",
+  "/api/chat/route": "/api/chat",
+  "/api/graph/route": "/api/graph",
+  "/api/upload/route": "/api/upload",
+  "/api/register/route": "/api/register",
+  "/page": "/",
+  "/login/page": "/login",
+  "/register/page": "/register"
+}
