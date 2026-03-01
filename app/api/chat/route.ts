@@ -1,7 +1,7 @@
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!;
 
 const GEMINI_STREAM_URL = (model: string) =>
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
+    `https://generativelanguage.googleapis.com/v1/models/${model}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
 
 export async function POST(req: Request) {
     try {
