@@ -1,4 +1,4 @@
-// File: C:\WepApp_2026\knowledge-hub\app\api\chat\route.ts
+// File: c:\WepApp_2026\knowledge-hub\app\api\chat\route.ts
 import * as entry from '../../../../../app/api/chat/route.js'
 import type { NextRequest } from 'next/server.js'
 

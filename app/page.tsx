@@ -1,5 +1,11 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
+import {
+    Menu, Plus, MessageSquare, X, Sparkles, Scale, Thermometer,
+    Download, Moon, Sun, LogOut, User, FileText, Paperclip, Mic,
+    MicOff, Send, Copy, Globe, Code, Brain, TrendingUp, BookOpen,
+    Languages, Pencil, Search, type LucideIcon,
+} from 'lucide-react';
 import Mermaid from '../components/Mermaid';
 import styles from './page.module.css';
 
@@ -81,19 +87,19 @@ function getErrorMessage(resp?: Response, err?: unknown): string {
     return '❌ Có lỗi xảy ra. Vui lòng thử lại!';
 }
 
-const SUGGESTIONS = [
-    { icon: '🌍', text: 'Biến đổi khí hậu', label: 'Giải thích biến đổi khí hậu là gì và tác động của nó' },
-    { icon: '💻', text: 'Viết code', label: 'Viết hàm Python đọc file CSV và tính trung bình cột' },
-    { icon: '🧠', text: 'Tâm lý học', label: 'Tại sao con người hay trì hoãn công việc quan trọng?' },
-    { icon: '📈', text: 'Đầu tư', label: 'Hướng dẫn đầu tư an toàn cho người mới bắt đầu' },
+const SUGGESTIONS: { icon: LucideIcon; text: string; label: string }[] = [
+    { icon: Globe, text: 'Biến đổi khí hậu', label: 'Giải thích biến đổi khí hậu là gì và tác động của nó' },
+    { icon: Code, text: 'Viết code', label: 'Viết hàm Python đọc file CSV và tính trung bình cột' },
+    { icon: Brain, text: 'Tâm lý học', label: 'Tại sao con người hay trì hoãn công việc quan trọng?' },
+    { icon: TrendingUp, text: 'Đầu tư', label: 'Hướng dẫn đầu tư an toàn cho người mới bắt đầu' },
 ];
 
-const PRESETS = [
-    { icon: '📚', label: 'Học tập', prompt: 'Giải thích khái niệm này một cách dễ hiểu: ' },
-    { icon: '💻', label: 'Code', prompt: 'Viết code để giải quyết bài toán: ' },
-    { icon: '🌐', label: 'Dịch thuật', prompt: 'Dịch sang tiếng Anh tự nhiên: ' },
-    { icon: '✍️', label: 'Sáng tạo', prompt: 'Viết một đoạn văn sáng tạo về chủ đề: ' },
-    { icon: '🔍', label: 'Phân tích', prompt: 'Phân tích ưu và nhược điểm của: ' },
+const PRESETS: { icon: LucideIcon; label: string; prompt: string }[] = [
+    { icon: BookOpen, label: 'Học tập', prompt: 'Giải thích khái niệm này một cách dễ hiểu: ' },
+    { icon: Code, label: 'Code', prompt: 'Viết code để giải quyết bài toán: ' },
+    { icon: Languages, label: 'Dịch thuật', prompt: 'Dịch sang tiếng Anh tự nhiên: ' },
+    { icon: Pencil, label: 'Sáng tạo', prompt: 'Viết một đoạn văn sáng tạo về chủ đề: ' },
+    { icon: Search, label: 'Phân tích', prompt: 'Phân tích ưu và nhược điểm của: ' },
 ];
 
 export default function Home() {
@@ -419,8 +425,8 @@ export default function Home() {
             {/* ── Sidebar ── */}
             <aside className={`${styles.sidebar} ${!sidebarOpen ? styles.collapsed : ''}`}>
                 <div className={styles.sidebarHeader}>
-                    <span className={styles.sidebarTitle}>✨ AI Chat</span>
-                    <button className={styles.newChatBtn} onClick={newChat}>+ Cuộc trò chuyện mới</button>
+                    <span className={styles.sidebarTitle}><Sparkles size={15} strokeWidth={2.5} /> AI Chat</span>
+                    <button className={styles.newChatBtn} onClick={newChat}><Plus size={15} strokeWidth={2.5} /> Cuộc trò chuyện mới</button>
                 </div>
                 <div className={styles.conversationList}>
                     {conversations.length === 0 && (
@@ -434,8 +440,9 @@ export default function Home() {
                             className={`${styles.convItem} ${c.id === activeId ? styles.active : ''}`}
                             onClick={() => { setActiveId(c.id); closeSidebarOnMobile(); }}
                         >
-                            <span className={styles.convTitle}>💬 {c.title || 'Cuộc trò chuyện mới'}</span>
-                            <button className={styles.convDelete} onClick={e => deleteConv(c.id, e)} title="Xóa">✕</button>
+                            <MessageSquare size={13} className={styles.convIcon} />
+                            <span className={styles.convTitle}>{c.title || 'Cuộc trò chuyện mới'}</span>
+                            <button className={styles.convDelete} onClick={e => deleteConv(c.id, e)} title="Xóa"><X size={13} /></button>
                         </div>
                     ))}
                 </div>
@@ -446,29 +453,29 @@ export default function Home() {
                 {/* Header */}
                 <header className={styles.header}>
                     <div className={styles.headerLeft}>
-                        <button className={styles.menuBtn} onClick={handleSidebarToggle} title="Sidebar">☰</button>
+                        <button className={styles.menuBtn} onClick={handleSidebarToggle} title="Sidebar"><Menu size={20} /></button>
                         <div>
-                            <div className={styles.headerTitle}>✨ AI Chat</div>
+                            <div className={styles.headerTitle}><Sparkles size={16} strokeWidth={2.5} className={styles.headerSpark} /> AI Chat</div>
                             <div className={styles.headerSubtitle}>Powered by Gemini</div>
                         </div>
                     </div>
                     <div className={styles.headerRight}>
                         <button className={`${styles.iconBtn} ${isDebateMode ? styles.active : ''}`} onClick={() => setIsDebateMode(p => !p)}>
-                            ⚖️<span className={styles.labelText}> Debate</span>
+                            <Scale size={15} /><span className={styles.labelText}> Debate</span>
                         </button>
                         <select className={styles.levelSelect} value={level} onChange={e => setLevel(e.target.value as ExpertiseLevel)}>
-                            <option value="Newbie">🎓 Đơn giản</option>
-                            <option value="Intermediate">🚀 Bình thường</option>
-                            <option value="Expert">🧠 Chuyên sâu</option>
+                            <option value="Newbie">Đơn giản</option>
+                            <option value="Intermediate">Bình thường</option>
+                            <option value="Expert">Chuyên sâu</option>
                         </select>
                         <select className={styles.modelSelect} value={model} onChange={e => setModel(e.target.value as ModelId)}>
-                            <option value="gemini-2.5-flash">⚡ 2.5 Flash</option>
-                            <option value="gemini-2.5-pro">🧠 2.5 Pro</option>
-                            <option value="gemini-2.0-flash">🔥 2.0 Flash</option>
+                            <option value="gemini-2.5-flash">2.5 Flash</option>
+                            <option value="gemini-2.5-pro">2.5 Pro</option>
+                            <option value="gemini-2.0-flash">2.0 Flash</option>
                         </select>
                         {/* Temperature slider – hidden on mobile via CSS */}
                         <div className={styles.tempControl} title={`Độ sáng tạo: ${temperature}`}>
-                            🌡️
+                            <Thermometer size={14} />
                             <input
                                 type="range"
                                 className={styles.tempSlider}
@@ -481,16 +488,16 @@ export default function Home() {
                             <span className={styles.tempValue}>{temperature.toFixed(1)}</span>
                         </div>
                         <button className={styles.iconBtn} onClick={exportChat} title="Xuất chat">
-                            📤<span className={styles.labelText}> Xuất</span>
+                            <Download size={15} /><span className={styles.labelText}> Xuất</span>
                         </button>
                         <button className={styles.iconBtn} onClick={toggleDark} title="Đổi giao diện">
-                            {darkMode ? '☀️' : '🌙'}
+                            {darkMode ? <Sun size={15} /> : <Moon size={15} />}
                         </button>
                         <button className={styles.iconBtn} onClick={async () => {
                             await fetch('/api/auth', { method: 'DELETE' });
                             window.location.href = '/login';
                         }} title="Đăng xuất" style={{ color: '#ef4444', borderColor: '#fca5a5' }}>
-                            🚪<span className={styles.labelText}> Thoát</span>
+                            <LogOut size={15} /><span className={styles.labelText}> Thoát</span>
                         </button>
                     </div>
                 </header>
@@ -499,13 +506,14 @@ export default function Home() {
                 <div className={styles.messageList}>
                     {messages.length === 0 ? (
                         <div className={styles.emptyState}>
-                            <div className={styles.emptyIcon}>✨</div>
+                            <div className={styles.emptyIcon}><Sparkles size={48} strokeWidth={1.5} /></div>
                             <div className={styles.emptyTitle}>Xin chào! Tôi là AI</div>
                             <div className={styles.emptySubtitle}>Tôi có thể trả lời mọi câu hỏi, phân tích hình ảnh, đọc file, viết code và nhiều hơn nữa.</div>
                             <div className={styles.suggestionGrid}>
                                 {SUGGESTIONS.map((s, i) => (
                                     <button key={i} className={styles.suggestionCard} onClick={() => handleSend(s.label)}>
-                                        {s.icon} {s.text}
+                                        <s.icon size={16} className={styles.suggestionIcon} />
+                                        {s.text}
                                     </button>
                                 ))}
                             </div>
@@ -514,14 +522,14 @@ export default function Home() {
                         messages.map((msg, idx) => (
                             <div key={idx} className={`${styles.messageRow} ${msg.role === 'user' ? styles.user : ''}`}>
                                 <div className={`${styles.avatar} ${msg.role === 'user' ? styles.avatarUser : styles.avatarAI}`}>
-                                    {msg.role === 'user' ? '👤' : '✨'}
+                                    {msg.role === 'user' ? <User size={16} strokeWidth={2} /> : <Sparkles size={16} strokeWidth={2} />}
                                 </div>
                                 <div className={styles.bubbleWrapper}>
                                     <div className={`${styles.bubble} ${msg.role === 'user' ? styles.bubbleUser : styles.bubbleAI}`}>
                                         {msg.attachment && (
                                             msg.attachment.isFile ? (
                                                 <div style={{ background: 'rgba(255,255,255,0.15)', borderRadius: 8, padding: '0.4rem 0.7rem', marginBottom: '0.5rem', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                                                    📄 {msg.attachment.name}
+                                                    <FileText size={13} /> {msg.attachment.name}
                                                 </div>
                                             ) : (
                                                 <img src={msg.attachment.dataUrl} alt="attachment" className={styles.msgImage} />
@@ -529,14 +537,14 @@ export default function Home() {
                                         )}
                                         {msg.content ? renderContent(msg.content) : (
                                             msg.role === 'assistant' && isLoading && idx === messages.length - 1
-                                                ? <span style={{ color: 'var(--muted)', fontStyle: 'italic' }}>Đang gõ...</span>
+                                                ? <span style={{ color: 'var(--muted)', fontStyle: 'italic' }}>Đang soạn...</span>
                                                 : null
                                         )}
                                     </div>
                                     <div className={styles.msgMeta}>{formatTime(msg.timestamp)}</div>
                                     {msg.role === 'assistant' && msg.content && (
                                         <div className={styles.msgActions}>
-                                            <button className={styles.actionBtn} onClick={() => navigator.clipboard.writeText(msg.content)}>📋 Copy</button>
+                                            <button className={styles.actionBtn} onClick={() => navigator.clipboard.writeText(msg.content)}><Copy size={12} /> Copy</button>
                                         </div>
                                     )}
                                 </div>
@@ -545,7 +553,7 @@ export default function Home() {
                     )}
                     {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
                         <div className={styles.typingRow}>
-                            <div className={`${styles.avatar} ${styles.avatarAI}`}>✨</div>
+                            <div className={`${styles.avatar} ${styles.avatarAI}`}><Sparkles size={16} strokeWidth={2} /></div>
                             <div className={styles.typingBubble}>
                                 <div className={styles.dot} /><div className={styles.dot} /><div className={styles.dot} />
                             </div>
@@ -560,7 +568,7 @@ export default function Home() {
                     <div className={styles.presetChips}>
                         {PRESETS.map((p, i) => (
                             <button key={i} className={styles.presetChip} onClick={() => handlePreset(p.prompt)}>
-                                {p.icon} {p.label}
+                                <p.icon size={12} />{p.label}
                             </button>
                         ))}
                     </div>
@@ -568,14 +576,14 @@ export default function Home() {
                     {attachment && (
                         <div className={styles.attachPreview}>
                             {attachment.isFile ? (
-                                <span>📄 {attachment.name}</span>
+                                <span><FileText size={14} /> {attachment.name}</span>
                             ) : (
                                 <img src={attachment.dataUrl} alt="preview" />
                             )}
                             <span style={{ flex: 1, fontSize: '0.8rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {attachment.name}
                             </span>
-                            <button className={styles.removeAttach} onClick={() => setAttachment(null)}>✕</button>
+                            <button className={styles.removeAttach} onClick={() => setAttachment(null)}><X size={14} /></button>
                         </div>
                     )}
                     <div className={styles.inputRow}>
@@ -603,19 +611,19 @@ export default function Home() {
                                 onClick={() => fileInputRef.current?.click()}
                                 title="Đính kèm ảnh hoặc file"
                                 disabled={isLoading}
-                            >📎</button>
+                            ><Paperclip size={18} /></button>
                             <button
                                 className={`${styles.inputIconBtn} ${isRecording ? styles.recording : ''}`}
                                 onClick={handleVoice}
                                 title={isRecording ? 'Đang ghi âm... (click để dừng)' : 'Nhập bằng giọng nói'}
                                 disabled={isLoading}
-                            >🎤</button>
+                            >{isRecording ? <MicOff size={18} /> : <Mic size={18} />}</button>
                             <button
                                 className={styles.sendBtn}
                                 onClick={() => handleSend(input)}
                                 disabled={isLoading || (!input.trim() && !attachment)}
                                 title="Gửi"
-                            >➤</button>
+                            ><Send size={17} strokeWidth={2} /></button>
                         </div>
                     </div>
                     {showCharCounter && (

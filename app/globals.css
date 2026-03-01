@@ -22,6 +22,8 @@
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.10);
   --radius: 12px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-top: env(safe-area-inset-top, 0px);
 }
 
 [data-theme="dark"] {
@@ -54,14 +56,26 @@
   padding: 0;
 }
 
-html,
+html {
+  height: 100%;
+  height: -webkit-fill-available;
+}
+
 body {
   height: 100%;
+  height: 100dvh;
   font-family: 'Inter', -apple-system, sans-serif;
   font-size: 15px;
   background: var(--bg);
   color: var(--foreground);
   transition: background 0.2s, color 0.2s;
+  overscroll-behavior: none;
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 14px;
+  }
 }
 
 button {

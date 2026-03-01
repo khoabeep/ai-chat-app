@@ -1,9 +1,22 @@
 import './globals.css';
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
     title: 'AI Chat Bot — Powered by Nguyễn Vũ Đăng Khoa',
-    description: 'Trợ lý AI thông minh, trả lời mọi câu hỏi của bạn',
+    description: 'Trợ lý AI thông minh, trả lời mọi câu hỏi của bạn. Powered by Gemini.',
+    keywords: ['AI chat', 'Gemini', 'chatbot', 'trí tuệ nhân tạo'],
+    authors: [{ name: 'Nguyễn Vũ Đăng Khoa' }],
+};
+
+export const viewport: Viewport = {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    themeColor: [
+        { media: '(prefers-color-scheme: light)', color: '#6366f1' },
+        { media: '(prefers-color-scheme: dark)', color: '#818cf8' },
+    ],
 };
 
 export default function RootLayout({
@@ -12,7 +25,7 @@ export default function RootLayout({
     children: React.ReactNode;
 }) {
     return (
-        <html lang="en">
+        <html lang="vi">
             <body>{children}</body>
         </html>
     );

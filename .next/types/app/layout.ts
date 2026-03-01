@@ -1,4 +1,4 @@
-// File: C:\WepApp_2026\knowledge-hub\app\layout.tsx
+// File: c:\WepApp_2026\knowledge-hub\app\layout.tsx
 import * as entry from '../../../app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
