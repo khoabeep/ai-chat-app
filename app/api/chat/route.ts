@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY!;
 
 const GEMINI_STREAM_URL = (model: string) =>
@@ -10,7 +12,8 @@ export async function POST(req: Request) {
             messages,
             expertiseLevel = 'Intermediate',
             isDebateMode = false,
-            model = 'gemini-1.5-flash',
+            model = 'gemini-2.5-flash',
+            temperature = 0.7,
             imageBase64 = null,
             imageMime = null,
             fileText = null,
@@ -68,7 +71,7 @@ Dùng Markdown với heading ### 🟢, ### 🔴, ### ⚖️.`
                 { role: 'user', parts: userParts }
             ],
             generationConfig: {
-                temperature: isDebateMode ? 0.8 : 0.7,
+                temperature: temperature,
             }
         };
 

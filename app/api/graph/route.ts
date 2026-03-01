@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { initKnowledgeBase } from '@/lib/rag';
 
+export const dynamic = 'force-dynamic';
+
 // A hack to access the local vectorStore from lib/rag.ts
 // Usually this is done via a DB query.
 import * as ragModule from '@/lib/rag';
