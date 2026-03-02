@@ -118,6 +118,7 @@ export default function Home() {
     const [attachment, setAttachment] = useState<Attachment | null>(null);
     const [markedReady, setMarkedReady] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
+    const [userEmail, setUserEmail] = useState<string | null>(null);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -146,6 +147,9 @@ export default function Home() {
         if (theme === 'dark') { setDarkMode(true); document.documentElement.setAttribute('data-theme', 'dark'); }
         const savedTemp = localStorage.getItem('temperature');
         if (savedTemp) setTemperature(parseFloat(savedTemp));
+        // Load saved user email
+        const savedEmail = localStorage.getItem('user_email');
+        if (savedEmail) setUserEmail(savedEmail);
         // On mobile, start with sidebar closed
         if (window.innerWidth <= 768) setSidebarOpen(false);
         loadMarked().then(() => setMarkedReady(true));
@@ -456,7 +460,7 @@ export default function Home() {
                         <button className={styles.menuBtn} onClick={handleSidebarToggle} title="Sidebar"><Menu size={20} /></button>
                         <div>
                             <div className={styles.headerTitle}><Sparkles size={16} strokeWidth={2.5} className={styles.headerSpark} /> AI Chat</div>
-                            <div className={styles.headerSubtitle}>Powered by Gemini</div>
+                            <div className={styles.headerSubtitle}>Powered by Groq & Llama</div>
                         </div>
                     </div>
                     <div className={styles.headerRight}>
@@ -493,8 +497,19 @@ export default function Home() {
                         <button className={styles.iconBtn} onClick={toggleDark} title="Đổi giao diện">
                             {darkMode ? <Sun size={15} /> : <Moon size={15} />}
                         </button>
+                        {userEmail && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.25rem 0.5rem', borderRadius: 20, background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                                <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+                                    {userEmail[0].toUpperCase()}
+                                </div>
+                                <span style={{ fontSize: '0.78rem', color: 'var(--text)', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} className={styles.labelText}>
+                                    {userEmail.split('@')[0]}
+                                </span>
+                            </div>
+                        )}
                         <button className={styles.iconBtn} onClick={async () => {
                             await fetch('/api/auth', { method: 'DELETE' });
+                            localStorage.removeItem('user_email');
                             window.location.href = '/login';
                         }} title="Đăng xuất" style={{ color: '#ef4444', borderColor: '#fca5a5' }}>
                             <LogOut size={15} /><span className={styles.labelText}> Thoát</span>
