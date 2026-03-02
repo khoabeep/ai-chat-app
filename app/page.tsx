@@ -30,7 +30,7 @@ type Conversation = {
 };
 
 type ExpertiseLevel = 'Newbie' | 'Intermediate' | 'Expert';
-type ModelId = 'gemini-2.5-flash' | 'gemini-2.5-pro' | 'gemini-2.0-flash';
+type ModelId = 'llama-3.3-70b-versatile' | 'mixtral-8x7b-32768' | 'meta-llama/llama-4-scout-17b-16e-instruct';
 
 const STORAGE_KEY = 'ai_chat_conversations';
 const MAX_INPUT_LENGTH = 4000;
@@ -111,7 +111,7 @@ export default function Home() {
     const [isMobile, setIsMobile] = useState(false);
     const [darkMode, setDarkMode] = useState(false);
     const [level, setLevel] = useState<ExpertiseLevel>('Intermediate');
-    const [model, setModel] = useState<ModelId>('gemini-2.5-flash');
+    const [model, setModel] = useState<ModelId>('llama-3.3-70b-versatile');
     const [temperature, setTemperature] = useState(0.7);
     const [isDebateMode, setIsDebateMode] = useState(false);
     const [isRecording, setIsRecording] = useState(false);
@@ -469,9 +469,9 @@ export default function Home() {
                             <option value="Expert">Chuyên sâu</option>
                         </select>
                         <select className={styles.modelSelect} value={model} onChange={e => setModel(e.target.value as ModelId)}>
-                            <option value="gemini-2.5-flash">2.5 Flash</option>
-                            <option value="gemini-2.5-pro">2.5 Pro</option>
-                            <option value="gemini-2.0-flash">2.0 Flash</option>
+                            <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
+                            <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
+                            <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Vision</option>
                         </select>
                         {/* Temperature slider – hidden on mobile via CSS */}
                         <div className={styles.tempControl} title={`Độ sáng tạo: ${temperature}`}>
@@ -506,9 +506,21 @@ export default function Home() {
                 <div className={styles.messageList}>
                     {messages.length === 0 ? (
                         <div className={styles.emptyState}>
-                            <div className={styles.emptyIcon}><Sparkles size={48} strokeWidth={1.5} /></div>
-                            <div className={styles.emptyTitle}>Xin chào! Tôi là AI</div>
-                            <div className={styles.emptySubtitle}>Tôi có thể trả lời mọi câu hỏi, phân tích hình ảnh, đọc file, viết code và nhiều hơn nữa.</div>
+                            <div className={styles.emptyIcon}>
+                                {isDebateMode ? <Scale size={48} strokeWidth={1.5} /> : <Sparkles size={48} strokeWidth={1.5} />}
+                            </div>
+                            <div className={styles.emptyTitle}>
+                                {isDebateMode ? 'Chế độ Tranh luận' : 'Xin chào! Tôi là AI'}
+                            </div>
+                            <div className={styles.emptySubtitle}>
+                                {isDebateMode
+                                    ? 'Tôi sẽ đóng 2 vai đối lập để phân tích đa chiều về câu hỏi của bạn.'
+                                    : `Tôi có thể trả lời mọi câu hỏi ở mức độ ${level === 'Newbie' ? 'Đơn giản' : level === 'Expert' ? 'Chuyên sâu' : 'Bình thường'}.`}
+                                <br />
+                                <span style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '4px', display: 'inline-block' }}>
+                                    Đang dùng: {model === 'llama-3.3-70b-versatile' ? 'Llama 3.3 70B' : model === 'mixtral-8x7b-32768' ? 'Mixtral 8x7B' : 'Llama 4 Vision (Scout 17B)'}
+                                </span>
+                            </div>
                             <div className={styles.suggestionGrid}>
                                 {SUGGESTIONS.map((s, i) => (
                                     <button key={i} className={styles.suggestionCard} onClick={() => handleSend(s.label)}>

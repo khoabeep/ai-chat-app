@@ -1,9 +1,7 @@
 export const dynamic = 'force-dynamic';
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY!;
-
-const GEMINI_STREAM_URL = (model: string) =>
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`;
+const GROQ_API_KEY = process.env.GROQ_API_KEY!;
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 export async function POST(req: Request) {
     try {
@@ -12,7 +10,7 @@ export async function POST(req: Request) {
             messages,
             expertiseLevel = 'Intermediate',
             isDebateMode = false,
-            model = 'gemini-2.5-flash',
+            model = 'llama-3.3-70b-versatile',
             temperature = 0.7,
             imageBase64 = null,
             imageMime = null,
@@ -31,13 +29,14 @@ export async function POST(req: Request) {
         }
 
         const systemInstruction = isDebateMode
-            ? `Bạn là một Hội đồng Chuyên gia đa chiều.
-NGUYÊN TẮC: Đóng 2 vai đối lập để tranh luận về câu hỏi người dùng.
-- VAI 1 (🟢 Ủng hộ): Bảo vệ ý tưởng, nhấn mạnh lợi ích, cơ hội.
-- VAI 2 (🔴 Phản biện): Nêu rủi ro, chỉ trích, bảo vệ sự an toàn.
-- ⚖️ KẾT LUẬN: Tổng hợp khách quan, đưa ra gợi ý thực tế.
-CÁ NHÂN HÓA: ${personaInstructions}
-Dùng Markdown với heading ### 🟢, ### 🔴, ### ⚖️.`
+            ? `You are a Multi-dimensional Expert Council.
+YOUR STRICT TASK: You MUST play TWO opposing roles to debate the user's prompt. You must NEVER give a standard single-viewpoint answer.
+- ROLE 1 (🟢 Pros): Defend the idea, highlight benefits, opportunities, and positive aspects.
+- ROLE 2 (🔴 Cons): Point out risks, criticize, and highlight negative aspects and safety concerns.
+- ⚖️ CONCLUSION: Provide an objective summary and practical advice.
+FORMAT REQUIREMENT: You MUST use Markdown with headings: ### 🟢 Ủng hộ, ### 🔴 Phản biện, ### ⚖️ Kết luận.
+LANGUAGE REQUIREMENT: You MUST reply entirely in Vietnamese.
+PERSONALIZATION: ${personaInstructions}`
             : `Bạn là một trợ lý AI toàn năng, thông minh và thân thiện.
 - Trả lời chính xác, chi tiết và hữu ích mọi câu hỏi.
 - Dùng Markdown (tiêu đề, code block, bảng, danh sách...) khi phù hợp.
@@ -45,53 +44,76 @@ Dùng Markdown với heading ### 🟢, ### 🔴, ### ⚖️.`
 - CÁ NHÂN HÓA: ${personaInstructions}
 - Trả lời tiếng Việt trừ khi được yêu cầu ngôn ngữ khác.`;
 
-        // Build conversation history
-        const history = messages.slice(0, -1).map((m: any) => ({
-            role: m.role === 'user' ? 'user' : 'model',
-            parts: [{ text: m.content }]
-        }));
+        // OpenAI/Groq messages format
+        const chatMessages: any[] = [
+            { role: 'system', content: systemInstruction }
+        ];
 
-        // Build current user parts
-        const userParts: any[] = [];
-
-        if (imageBase64 && imageMime) {
-            userParts.push({ inlineData: { data: imageBase64, mimeType: imageMime } });
+        // Add history
+        for (let i = 0; i < messages.length - 1; i++) {
+            chatMessages.push({
+                role: messages[i].role === 'user' ? 'user' : 'assistant',
+                content: messages[i].content
+            });
         }
+
+        // Build current user message
+        let userContent: any = [];
+        let promptText = latestMessage;
 
         if (fileText) {
-            userParts.push({ text: `[Nội dung file được đính kèm]\n\n${fileText}\n\n[Câu hỏi]: ${latestMessage}` });
-        } else {
-            userParts.push({ text: latestMessage });
+            promptText = `[Nội dung file được đính kèm]\n\n${fileText}\n\n[Câu hỏi]: ${latestMessage}`;
         }
 
+        // If there's an image, we MUST use the vision model
+        const actualModel = (imageBase64 && imageMime) ? 'meta-llama/llama-4-scout-17b-16e-instruct' : model;
+
+        if (imageBase64 && imageMime) {
+            // Multimodal format for Groq Vision
+            userContent.push({ type: 'text', text: promptText });
+            userContent.push({
+                type: 'image_url',
+                image_url: {
+                    url: `data:${imageMime};base64,${imageBase64}`
+                }
+            });
+        } else {
+            // Text only format
+            userContent = promptText;
+        }
+
+        chatMessages.push({
+            role: 'user',
+            content: userContent
+        });
+
         const requestBody = {
-            system_instruction: { parts: [{ text: systemInstruction }] },
-            contents: [
-                ...history,
-                { role: 'user', parts: userParts }
-            ],
-            generationConfig: {
-                temperature: temperature,
-            }
+            model: actualModel,
+            messages: chatMessages,
+            temperature: temperature,
+            stream: true,
         };
 
-        const geminiResponse = await fetch(GEMINI_STREAM_URL(model), {
+        const response = await fetch(GROQ_API_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${GROQ_API_KEY}`
+            },
             body: JSON.stringify(requestBody),
         });
 
-        if (!geminiResponse.ok) {
-            const errText = await geminiResponse.text();
-            console.error('Gemini API error:', errText);
-            return new Response(JSON.stringify({ error: 'Gemini API error' }), { status: 500 });
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error('Groq API error:', errText);
+            return new Response(JSON.stringify({ error: 'Groq API error' }), { status: response.status });
         }
 
-        // Parse SSE stream and forward as plain text
+        // Parse SSE stream from OpenAI/Groq format
         const encoder = new TextEncoder();
         const readable = new ReadableStream({
             async start(controller) {
-                const reader = geminiResponse.body!.getReader();
+                const reader = response.body!.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
 
@@ -105,13 +127,18 @@ Dùng Markdown với heading ### 🟢, ### 🔴, ### ⚖️.`
                         buffer = lines.pop() || '';
 
                         for (const line of lines) {
-                            if (!line.startsWith('data: ')) continue;
-                            const jsonStr = line.slice(6).trim();
+                            const trimmed = line.trim();
+                            if (!trimmed.startsWith('data: ')) continue;
+                            const jsonStr = trimmed.slice(6).trim();
+
                             if (!jsonStr || jsonStr === '[DONE]') continue;
+
                             try {
                                 const chunk = JSON.parse(jsonStr);
-                                const text = chunk?.candidates?.[0]?.content?.parts?.[0]?.text;
-                                if (text) controller.enqueue(encoder.encode(text));
+                                const content = chunk.choices?.[0]?.delta?.content;
+                                if (content) {
+                                    controller.enqueue(encoder.encode(content));
+                                }
                             } catch { /* skip malformed chunks */ }
                         }
                     }
