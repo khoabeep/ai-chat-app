@@ -429,7 +429,7 @@ export default function Home() {
             {/* ── Sidebar ── */}
             <aside className={`${styles.sidebar} ${!sidebarOpen ? styles.collapsed : ''}`}>
                 <div className={styles.sidebarHeader}>
-                    <span className={styles.sidebarTitle}><Sparkles size={15} strokeWidth={2.5} /> AI Chat</span>
+                    <span className={styles.sidebarTitle}><Sparkles size={15} strokeWidth={2.5} /> KhoaAI</span>
                     <button className={styles.newChatBtn} onClick={newChat}><Plus size={15} strokeWidth={2.5} /> Cuộc trò chuyện mới</button>
                 </div>
                 <div className={styles.conversationList}>
@@ -459,26 +459,47 @@ export default function Home() {
                     <div className={styles.headerLeft}>
                         <button className={styles.menuBtn} onClick={handleSidebarToggle} title="Sidebar"><Menu size={20} /></button>
                         <div>
-                            <div className={styles.headerTitle}><Sparkles size={16} strokeWidth={2.5} className={styles.headerSpark} /> AI Chat</div>
-                            <div className={styles.headerSubtitle}>Powered by Groq & Llama</div>
+                            <div className={styles.headerTitle}><Sparkles size={16} strokeWidth={2.5} className={styles.headerSpark} /> KhoaAI</div>
+                            <div className={styles.headerSubtitle}>Powered by AI của KhoaAI</div>
                         </div>
                     </div>
                     <div className={styles.headerRight}>
-                        <button className={`${styles.iconBtn} ${isDebateMode ? styles.active : ''}`} onClick={() => setIsDebateMode(p => !p)}>
-                            <Scale size={15} /><span className={styles.labelText}> Debate</span>
+                        {/* Guest badge */}
+                        {!userEmail && (
+                            <a href="/login" style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.6rem', borderRadius: 20, background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.4)', color: '#fbbf24', fontSize: '0.75rem', fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }} title="Đăng nhập để mở khóa tính năng">
+                                👤 Guest
+                            </a>
+                        )}
+                        <button
+                            className={`${styles.iconBtn} ${isDebateMode ? styles.active : ''} ${!userEmail ? styles.locked : ''}`}
+                            onClick={() => userEmail ? setIsDebateMode(p => !p) : window.location.href = '/login'}
+                            title={userEmail ? 'Chế độ tranh luận' : '🔒 Đăng nhập để dùng Debate'}
+                        >
+                            <Scale size={15} /><span className={styles.labelText}> Debate{!userEmail && ' 🔒'}</span>
                         </button>
                         <select className={styles.levelSelect} value={level} onChange={e => setLevel(e.target.value as ExpertiseLevel)}>
                             <option value="Newbie">Đơn giản</option>
                             <option value="Intermediate">Bình thường</option>
                             <option value="Expert">Chuyên sâu</option>
                         </select>
-                        <select className={styles.modelSelect} value={model} onChange={e => setModel(e.target.value as ModelId)}>
-                            <option value="llama-3.3-70b-versatile">Llama 3.3 70B</option>
-                            <option value="mixtral-8x7b-32768">Mixtral 8x7B</option>
-                            <option value="meta-llama/llama-4-scout-17b-16e-instruct">Llama 4 Vision</option>
+                        <select
+                            className={styles.modelSelect}
+                            value={userEmail ? model : 'llama-3.3-70b-versatile'}
+                            onChange={e => { if (userEmail) setModel(e.target.value as ModelId); else window.location.href = '/login'; }}
+                            title={userEmail ? '' : '🔒 Đăng nhập để chọn mô hình'}
+                            style={!userEmail ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+                        >
+                            <option value="llama-3.3-70b-versatile">KhoaAI Standard</option>
+                            {userEmail && <option value="mixtral-8x7b-32768">KhoaAI Turbo</option>}
+                            {userEmail && <option value="meta-llama/llama-4-scout-17b-16e-instruct">KhoaAI Vision 🔓</option>}
+                            {!userEmail && <option disabled value="">⭐ Đăng nhập để xem thêm...</option>}
                         </select>
                         {/* Temperature slider – hidden on mobile via CSS */}
-                        <div className={styles.tempControl} title={`Độ sáng tạo: ${temperature}`}>
+                        <div
+                            className={styles.tempControl}
+                            title={userEmail ? `Độ sáng tạo: ${temperature}` : '🔒 Đăng nhập để điều chỉnh'}
+                            style={!userEmail ? { opacity: 0.4, pointerEvents: 'none' } : {}}
+                        >
                             <Thermometer size={14} />
                             <input
                                 type="range"
@@ -488,11 +509,17 @@ export default function Home() {
                                 step={0.1}
                                 value={temperature}
                                 onChange={e => handleTempChange(parseFloat(e.target.value))}
+                                disabled={!userEmail}
                             />
                             <span className={styles.tempValue}>{temperature.toFixed(1)}</span>
                         </div>
-                        <button className={styles.iconBtn} onClick={exportChat} title="Xuất chat">
-                            <Download size={15} /><span className={styles.labelText}> Xuất</span>
+                        <button
+                            className={styles.iconBtn}
+                            onClick={() => userEmail ? exportChat() : window.location.href = '/login'}
+                            title={userEmail ? 'Xuất chat' : '🔒 Đăng nhập để xuất chat'}
+                            style={!userEmail ? { opacity: 0.45 } : {}}
+                        >
+                            <Download size={15} /><span className={styles.labelText}> Xuất{!userEmail && ' 🔒'}</span>
                         </button>
                         <button className={styles.iconBtn} onClick={toggleDark} title="Đổi giao diện">
                             {darkMode ? <Sun size={15} /> : <Moon size={15} />}
@@ -525,7 +552,7 @@ export default function Home() {
                                 {isDebateMode ? <Scale size={48} strokeWidth={1.5} /> : <Sparkles size={48} strokeWidth={1.5} />}
                             </div>
                             <div className={styles.emptyTitle}>
-                                {isDebateMode ? 'Chế độ Tranh luận' : 'Xin chào! Tôi là AI'}
+                                {isDebateMode ? 'Chế độ Tranh luận' : 'Xin chào! Tôi là KhoaAI'}
                             </div>
                             <div className={styles.emptySubtitle}>
                                 {isDebateMode
@@ -533,7 +560,7 @@ export default function Home() {
                                     : `Tôi có thể trả lời mọi câu hỏi ở mức độ ${level === 'Newbie' ? 'Đơn giản' : level === 'Expert' ? 'Chuyên sâu' : 'Bình thường'}.`}
                                 <br />
                                 <span style={{ fontSize: '0.8rem', opacity: 0.7, marginTop: '4px', display: 'inline-block' }}>
-                                    Đang dùng: {model === 'llama-3.3-70b-versatile' ? 'Llama 3.3 70B' : model === 'mixtral-8x7b-32768' ? 'Mixtral 8x7B' : 'Llama 4 Vision (Scout 17B)'}
+                                    Đang dùng: {model === 'llama-3.3-70b-versatile' ? 'KhoaAI Standard' : model === 'mixtral-8x7b-32768' ? 'KhoaAI Turbo' : 'KhoaAI Vision'}
                                 </span>
                             </div>
                             <div className={styles.suggestionGrid}>
@@ -635,15 +662,17 @@ export default function Home() {
                             />
                             <button
                                 className={styles.inputIconBtn}
-                                onClick={() => fileInputRef.current?.click()}
-                                title="Đính kèm ảnh hoặc file"
+                                onClick={() => userEmail ? fileInputRef.current?.click() : window.location.href = '/login'}
+                                title={userEmail ? 'Đính kèm ảnh hoặc file' : '🔒 Đăng nhập để đính kèm'}
                                 disabled={isLoading}
+                                style={!userEmail ? { opacity: 0.4 } : {}}
                             ><Paperclip size={18} /></button>
                             <button
                                 className={`${styles.inputIconBtn} ${isRecording ? styles.recording : ''}`}
-                                onClick={handleVoice}
-                                title={isRecording ? 'Đang ghi âm... (click để dừng)' : 'Nhập bằng giọng nói'}
+                                onClick={() => userEmail ? handleVoice() : window.location.href = '/login'}
+                                title={userEmail ? (isRecording ? 'Đang ghi âm... (click để dừng)' : 'Nhập bằng giọng nói') : '🔒 Đăng nhập để dùng giọng nói'}
                                 disabled={isLoading}
+                                style={!userEmail ? { opacity: 0.4 } : {}}
                             >{isRecording ? <MicOff size={18} /> : <Mic size={18} />}</button>
                             <button
                                 className={styles.sendBtn}

@@ -2,9 +2,9 @@ import './globals.css';
 import type { Metadata, Viewport } from 'next';
 
 export const metadata: Metadata = {
-    title: 'AI Chat Bot — Powered by Nguyễn Vũ Đăng Khoa',
-    description: 'Trợ lý AI thông minh, trả lời mọi câu hỏi của bạn. Powered by Gemini.',
-    keywords: ['AI chat', 'Gemini', 'chatbot', 'trí tuệ nhân tạo'],
+    title: 'KhoaAI — Trợ lý AI thông minh',
+    description: 'KhoaAI - Trợ lý AI thông minh, trả lời mọi câu hỏi của bạn. Powered by KhoaAI.',
+    keywords: ['KhoaAI', 'AI chat', 'chatbot', 'trí tuệ nhân tạo'],
     authors: [{ name: 'Nguyễn Vũ Đăng Khoa' }],
 };
 

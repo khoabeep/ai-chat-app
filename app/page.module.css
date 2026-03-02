@@ -101,7 +101,7 @@
 }
 
 .convIcon {
-    color: rgba(255,255,255,0.35);
+    color: rgba(255, 255, 255, 0.35);
     flex-shrink: 0;
 }
 
@@ -243,6 +243,19 @@
     border-color: #ef4444;
     color: #ef4444;
     font-weight: 600;
+}
+
+.iconBtn.locked {
+    opacity: 0.5;
+    cursor: pointer;
+    filter: grayscale(30%);
+}
+
+.iconBtn.locked:hover {
+    background: rgba(251, 191, 36, 0.1);
+    border-color: rgba(251, 191, 36, 0.4);
+    color: #fbbf24;
+    opacity: 0.8;
 }
 
 /* Label text that hides on mobile */

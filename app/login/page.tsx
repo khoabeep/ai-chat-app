@@ -48,7 +48,7 @@ export default function LoginPage() {
                 <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
                     <div style={{ width: 64, height: 64, background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', borderRadius: 18, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', marginBottom: '1rem', boxShadow: '0 8px 24px rgba(99,102,241,0.4)' }}>✨</div>
                     <h1 style={{ color: '#f1f5f9', fontSize: '1.6rem', fontWeight: 700, marginBottom: '0.4rem' }}>Chào mừng trở lại</h1>
-                    <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Đăng nhập để tiếp tục với AI Chat</p>
+                    <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>Đăng nhập để tiếp tục với KhoaAI</p>
                 </div>
 
                 <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
