@@ -227,14 +227,14 @@ PERSONALIZATION: ${personaInstructions}`
                 'Cache-Control': 'no-cache',
                 // #7/#8: Search metadata for client
                 'X-Search-Done': searchDone ? 'true' : 'false',
-                // Truncate để tránh Vercel header size limit (~8KB)
-                'X-Search-Sources': searchDone ? JSON.stringify(
+                // Base64-encode để tránh lỗi Unicode trong HTTP header (ByteString > 255)
+                'X-Search-Sources': searchDone ? Buffer.from(JSON.stringify(
                     searchSources.slice(0, 3).map((s: any) => ({
                         title: (s.title || '').slice(0, 80),
                         url: s.url || '',
                         snippet: (s.snippet || '').slice(0, 150),
                     }))
-                ) : '[]',
+                )).toString('base64') : '',
                 'Access-Control-Expose-Headers': 'X-Search-Done, X-Search-Sources',
             }
         });

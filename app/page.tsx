@@ -292,7 +292,10 @@ export default function Home() {
             setIsSearching(false);
             let sources: SearchSource[] = [];
             if (searchDone) {
-                try { sources = JSON.parse(resp.headers.get('X-Search-Sources') || '[]'); } catch { }
+                try {
+                    const b64 = resp.headers.get('X-Search-Sources') || '';
+                    if (b64) sources = JSON.parse(atob(b64));
+                } catch { }
             }
 
             if (!resp.ok || !resp.body) throw new Error(getErrorMessage(resp));
