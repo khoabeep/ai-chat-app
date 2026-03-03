@@ -7,8 +7,14 @@ export async function POST(req: Request) {
         const result = await firebaseLogin(email, password);
 
         const response = NextResponse.json({ ok: true, email: result.email });
-        // Store the Firebase idToken in a secure cookie (1 hour expiry)
         response.cookies.set('auth_token', result.idToken, {
+            httpOnly: true,
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 60 * 60 * 24 * 7,
+        });
+        // #2/#12: Store uid for Firestore access
+        response.cookies.set('user_uid', result.localId, {
             httpOnly: true,
             sameSite: 'lax',
             path: '/',
@@ -23,5 +29,6 @@ export async function POST(req: Request) {
 export async function DELETE() {
     const response = NextResponse.json({ ok: true });
     response.cookies.delete('auth_token');
+    response.cookies.delete('user_uid');
     return response;
 }

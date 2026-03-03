@@ -13,6 +13,12 @@ export async function POST(req: Request) {
             path: '/',
             maxAge: 60 * 60 * 24 * 7,
         });
+        response.cookies.set('user_uid', result.localId, {
+            httpOnly: true,
+            sameSite: 'lax',
+            path: '/',
+            maxAge: 60 * 60 * 24 * 7,
+        });
         return response;
     } catch (err: any) {
         return NextResponse.json({ ok: false, error: err.message }, { status: 400 });

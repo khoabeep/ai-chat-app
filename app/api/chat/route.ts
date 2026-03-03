@@ -1,11 +1,44 @@
 export const dynamic = 'force-dynamic';
 
 import { searchWeb } from '@/lib/search';
+import { cookies } from 'next/headers';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY!;
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
+// ── In-memory rate limiter (#4) ───────────────────────────────────────────────
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT = 20;       // requests
+const RATE_WINDOW = 60_000;  // 1 minute
+
+function checkRateLimit(ip: string): boolean {
+    const now = Date.now();
+    const entry = rateLimitMap.get(ip);
+    if (!entry || now > entry.resetAt) {
+        rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW });
+        return true;
+    }
+    if (entry.count >= RATE_LIMIT) return false;
+    entry.count++;
+    return true;
+}
+
 export async function POST(req: Request) {
+    // ── #4 Rate limiting ──────────────────────────────────────────────────────
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    if (!checkRateLimit(ip)) {
+        return new Response(JSON.stringify({ error: 'Đã vượt giới hạn 20 tin nhắn/phút. Vui lòng thử lại sau!' }), {
+            status: 429,
+            headers: { 'Content-Type': 'application/json' }
+        });
+    }
+
+    // ── #5 Auth guard ─────────────────────────────────────────────────────────
+    const cookieStore = await cookies();
+    const authToken = cookieStore.get('auth_token')?.value;
+    // Allow guests but limit features (handled client-side, server just logs)
+    const isAuthenticated = !!authToken;
+
     try {
         const body = await req.json();
         const {
@@ -53,12 +86,17 @@ PERSONALIZATION: ${personaInstructions}`
 
         // Check xem có cần web search không
         let searchData = '';
+        let searchSources: any[] = [];
+        let searchDone = false;
         if (!isDebateMode) {
             const { generateSearchQuery } = await import('@/lib/search');
             const searchQuery = await generateSearchQuery(messages);
             if (searchQuery) {
-                console.log("[Chat Route] LLM generated search query:", searchQuery);
-                searchData = await searchWeb(searchQuery);
+                console.log("[Chat Route] Search query:", searchQuery);
+                const result = await searchWeb(searchQuery);
+                searchData = result.text;
+                searchSources = result.sources;
+                searchDone = result.text.length > 0;
             }
         }
 
@@ -177,6 +215,10 @@ PERSONALIZATION: ${personaInstructions}`
                 'Content-Type': 'text/plain; charset=utf-8',
                 'X-Accel-Buffering': 'no',
                 'Cache-Control': 'no-cache',
+                // #7/#8: Search metadata for client
+                'X-Search-Done': searchDone ? 'true' : 'false',
+                'X-Search-Sources': searchDone ? JSON.stringify(searchSources) : '[]',
+                'Access-Control-Expose-Headers': 'X-Search-Done, X-Search-Sources',
             }
         });
 

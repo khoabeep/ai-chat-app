@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "lucide-react": "^0.575.0",
+    "marked": "^17.0.3",
     "next": "15.3.6",
+    "pdfjs-dist": "^5.5.207",
     "react": "^19",
     "react-dom": "^19"
   },

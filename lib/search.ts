@@ -1,18 +1,29 @@
 // lib/search.ts
 // Web search utility using Serper.dev API with smart in-memory cache
 
+export type SearchSource = {
+    title: string;
+    url: string;
+    snippet: string;
+};
+
+export type SearchResult = {
+    text: string;
+    sources: SearchSource[];
+};
+
 const SERPER_API_KEY = (process.env.SERPER_API_KEY || '').trim();
 const SERPER_API_URL = 'https://google.serper.dev/search';
 
 // ─── Smart Cache (in-memory, 30 phút TTL) ────────────────────────────────────
 interface CacheEntry {
-    result: string;
+    result: SearchResult;
     expiry: number;
 }
 const searchCache = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 phút
 
-function getCached(key: string): string | null {
+function getCached(key: string): SearchResult | null {
     const entry = searchCache.get(key);
     if (!entry) return null;
     if (Date.now() > entry.expiry) {
@@ -22,8 +33,7 @@ function getCached(key: string): string | null {
     return entry.result;
 }
 
-function setCache(key: string, result: string): void {
-    // Giới hạn cache tối đa 200 entries để tránh memory leak
+function setCache(key: string, result: SearchResult): void {
     if (searchCache.size >= 200) {
         const firstKey = searchCache.keys().next().value;
         if (firstKey) searchCache.delete(firstKey);
@@ -119,16 +129,15 @@ Examples:
 }
 
 // ─── Main Search Function ─────────────────────────────────────────────────────
-export async function searchWeb(query: string): Promise<string> {
+export async function searchWeb(query: string): Promise<SearchResult> {
+    const empty: SearchResult = { text: '', sources: [] };
+
     if (!SERPER_API_KEY) {
         console.error('[Search] SERPER_API_KEY is not configured');
-        return '';
+        return empty;
     }
 
-    // Normalize cache key
     const cacheKey = query.toLowerCase().trim();
-
-    // Check cache trước
     const cached = getCached(cacheKey);
     if (cached) {
         console.log(`[Search] Cache hit: "${query}"`);
@@ -146,38 +155,36 @@ export async function searchWeb(query: string): Promise<string> {
             },
             body: JSON.stringify({
                 q: query,
-                gl: 'vn',      // Ưu tiên kết quả từ Việt Nam
-                hl: 'vi',      // Ngôn ngữ tiếng Việt
-                num: 5,        // Lấy 5 kết quả
+                gl: 'vn',
+                hl: 'vi',
+                num: 5,
             }),
         });
 
         if (!response.ok) {
             console.error('[Search] Serper API error:', response.status);
-            return '';
+            return empty;
         }
 
         const data = await response.json();
         const result = formatSearchResults(data);
-
-        // Lưu vào cache
         setCache(cacheKey, result);
-
         return result;
     } catch (error) {
         console.error('[Search] Error:', error);
-        return '';
+        return empty;
     }
 }
 
-// ─── Format kết quả search thành text cho AI ─────────────────────────────────
-function formatSearchResults(data: any): string {
+// ─── Format kết quả search thành text + sources cho AI ──────────────────────
+function formatSearchResults(data: any): SearchResult {
     const parts: string[] = [];
+    const sources: SearchSource[] = [];
     const today = new Date().toLocaleDateString('vi-VN');
 
     parts.push(`[Kết quả tìm kiếm Google - Ngày ${today}]`);
 
-    // Answer box (Google's featured snippet)
+    // Answer box
     if (data.answerBox) {
         const ab = data.answerBox;
         if (ab.answer) parts.push(`📌 Câu trả lời nhanh: ${ab.answer}`);
@@ -185,9 +192,10 @@ function formatSearchResults(data: any): string {
         if (ab.snippetHighlighted?.length) {
             parts.push(`Điểm nổi bật: ${ab.snippetHighlighted.join(', ')}`);
         }
+        if (ab.link) sources.push({ title: ab.title || 'Answer Box', url: ab.link, snippet: ab.answer || ab.snippet || '' });
     }
 
-    // Sports results (bảng xếp hạng, tỷ số)
+    // Sports results
     if (data.sportsResults) {
         const sr = data.sportsResults;
         if (sr.title) parts.push(`\n⚽ ${sr.title}`);
@@ -211,6 +219,7 @@ function formatSearchResults(data: any): string {
         data.organic.slice(0, 4).forEach((item: any, i: number) => {
             parts.push(`${i + 1}. ${item.title}`);
             if (item.snippet) parts.push(`   ${item.snippet}`);
+            if (item.link) sources.push({ title: item.title || `Kết quả ${i + 1}`, url: item.link, snippet: item.snippet || '' });
         });
     }
 
@@ -227,5 +236,5 @@ function formatSearchResults(data: any): string {
         }
     }
 
-    return parts.join('\n');
+    return { text: parts.join('\n'), sources };
 }
