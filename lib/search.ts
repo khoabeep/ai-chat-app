@@ -1,7 +1,7 @@
 // lib/search.ts
 // Web search utility using Serper.dev API with smart in-memory cache
 
-const SERPER_API_KEY = process.env.SERPER_API_KEY!;
+const SERPER_API_KEY = (process.env.SERPER_API_KEY || '').trim();
 const SERPER_API_URL = 'https://google.serper.dev/search';
 
 // ─── Smart Cache (in-memory, 30 phút TTL) ────────────────────────────────────
@@ -120,6 +120,11 @@ Examples:
 
 // ─── Main Search Function ─────────────────────────────────────────────────────
 export async function searchWeb(query: string): Promise<string> {
+    if (!SERPER_API_KEY) {
+        console.error('[Search] SERPER_API_KEY is not configured');
+        return '';
+    }
+
     // Normalize cache key
     const cacheKey = query.toLowerCase().trim();
 
