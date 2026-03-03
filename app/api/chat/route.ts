@@ -89,14 +89,24 @@ PERSONALIZATION: ${personaInstructions}`
         let searchSources: any[] = [];
         let searchDone = false;
         if (!isDebateMode) {
-            const { generateSearchQuery } = await import('@/lib/search');
-            const searchQuery = await generateSearchQuery(messages);
-            if (searchQuery) {
-                console.log("[Chat Route] Search query:", searchQuery);
-                const result = await searchWeb(searchQuery);
-                searchData = result.text;
-                searchSources = result.sources;
-                searchDone = result.text.length > 0;
+            try {
+                const { generateSearchQuery } = await import('@/lib/search');
+                const searchQuery = await generateSearchQuery(messages);
+                if (searchQuery) {
+                    console.log("[Chat Route] Search query:", searchQuery);
+                    // Timeout 6s để tránh Vercel function timeout
+                    const timeoutResult = { text: '', sources: [] as any[] };
+                    const result = await Promise.race([
+                        searchWeb(searchQuery),
+                        new Promise<typeof timeoutResult>(res => setTimeout(() => res(timeoutResult), 6000))
+                    ]);
+                    searchData = result.text;
+                    searchSources = result.sources;
+                    searchDone = result.text.length > 0;
+                }
+            } catch (searchErr) {
+                console.error('[Chat Route] Search failed, continuing without search:', searchErr);
+                // Tiếp tục không có search data
             }
         }
 
@@ -217,7 +227,14 @@ PERSONALIZATION: ${personaInstructions}`
                 'Cache-Control': 'no-cache',
                 // #7/#8: Search metadata for client
                 'X-Search-Done': searchDone ? 'true' : 'false',
-                'X-Search-Sources': searchDone ? JSON.stringify(searchSources) : '[]',
+                // Truncate để tránh Vercel header size limit (~8KB)
+                'X-Search-Sources': searchDone ? JSON.stringify(
+                    searchSources.slice(0, 3).map((s: any) => ({
+                        title: (s.title || '').slice(0, 80),
+                        url: s.url || '',
+                        snippet: (s.snippet || '').slice(0, 150),
+                    }))
+                ) : '[]',
                 'Access-Control-Expose-Headers': 'X-Search-Done, X-Search-Sources',
             }
         });
