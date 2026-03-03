@@ -31,29 +31,58 @@ function setCache(key: string, result: string): void {
     searchCache.set(key, { result, expiry: Date.now() + CACHE_TTL_MS });
 }
 
-// ─── Query Generation (sử dụng LLM nhỏ để biết có nên search không) ────────────
+// ─── Keyword patterns that ALWAYS require a web search ──────────────────────
+const SEARCH_PATTERNS = [
+    // Sports
+    /bxh|bảng xếp hạng|đứng thứ|đứng hạng|tỷ số|kết quả.*trận|lịch thi đấu|vô địch|danh sách.*cầu thủ|transfer|chuyển nhượng|standings?|premier league|epl|la liga|serie a|bundesliga|champions league|europa league|man (utd?|united|city)|liverpool|chelsea|arsenal|barcelona|real madrid|juventus|psg|inter milan|ac milan/i,
+    // News & current events
+    /tin tức|mới nhất|hiện tại|hiện nay|gần đây|vừa xảy ra|breaking|latest news|hôm nay.*xảy ra|hôm nay.*gì/i,
+    // Prices, markets, stocks
+    /giá (vàng|xăng|dầu|usd|bitcoin|btc|eth|cổ phiếu|nhà đất|chứng khoán)|tỷ giá|exchange rate|stock price|crypto/i,
+    // Weather
+    /thời tiết|dự báo|nhiệt độ|weather|forecast/i,
+    // Time/date queries (fallback even though datetime is injected)
+    /hôm nay (là ngày|thứ)|bây giờ (là|mấy) giờ|ngày (mấy|bao nhiêu) tháng/i,
+    // People - current role/position
+    /(ai|người nào).*(tổng thống|thủ tướng|giám đốc|CEO|chủ tịch).*(hiện|đang|bây giờ)|(tổng thống|thủ tướng|giám đốc|CEO).*(hiện tại|bây giờ|hiện nay)/i,
+];
+
+function detectSearchByKeyword(text: string): boolean {
+    return SEARCH_PATTERNS.some(p => p.test(text));
+}
+
+// ─── Query Generation ─────────────────────────────────────────────────────────
+// Step 1: keyword detection (fast, reliable)
+// Step 2: LLM fallback for ambiguous cases
 export async function generateSearchQuery(messages: any[]): Promise<string | null> {
+    const latestMessage = messages[messages.length - 1];
+    const latestText = typeof latestMessage?.content === 'string'
+        ? latestMessage.content
+        : JSON.stringify(latestMessage?.content ?? '');
+
+    // ── Keyword fast-path: skip LLM entirely ─────────────────────────────────
+    if (detectSearchByKeyword(latestText)) {
+        console.log('[Search] Keyword match — directly searching:', latestText);
+        return latestText.trim();
+    }
+
+    // ── LLM fallback for ambiguous queries ────────────────────────────────────
     try {
         const GROQ_API_KEY = process.env.GROQ_API_KEY;
         if (!GROQ_API_KEY) return null;
 
         const systemPrompt = `You are a web search query generator.
-Your task is to determine if the user's latest message requires a real-time web search.
-You MUST generate a search query if the user asks about:
-- Current Date & Time (e.g., "hôm nay là ngày mấy", "bây giờ là mấy giờ", "hôm nay thứ mấy")
-- News & Real-world facts that change over time
-- Sports scores, matches, standings
-- Prices, weather, events
+Determine if the user's latest message requires a real-time web search.
+Search is needed for: news, current events, sports, prices, real-world facts that change over time.
+Search is NOT needed for: coding, math, explanations, opinions, general knowledge, greetings.
 
-If it DOES NOT need a search, reply ONLY with "NO".
-If it DOES need a search, generate a very concise and effective Google search query keywords (under 5 words if possible) based on the latest message AND the conversation context.
-DO NOT wrap the search query in quotes. DO NOT add any other text.
-Examples: 
-User: "hôm nay là ngày mấy?" -> "hôm nay là ngày mấy"
-User: "ai là tổng thống nam phi hiện tại?" -> "tổng thống nam phi"
-User: "man utd đứng thứ mấy" -> "thứ hạng man utd epl"
-User: "năm 2026 thì sao" (context: discussing epl) -> "bảng xếp hạng epl 2026"
-User: "cảm ơn bạn" -> "NO"`;
+If NO search needed: reply ONLY "NO".
+If search needed: reply with a concise Google search query (max 6 words). No quotes, no extra text.
+Examples:
+"ai phát minh ra bóng đèn?" -> NO
+"tổng thống mỹ hiện tại?" -> tổng thống mỹ 2026
+"man utd BXH EPL" -> man utd standings premier league 2026
+"cảm ơn" -> NO`;
 
         const chatMessages = [
             { role: 'system', content: systemPrompt },
@@ -73,18 +102,15 @@ User: "cảm ơn bạn" -> "NO"`;
                 model: 'llama-3.1-8b-instant',
                 messages: chatMessages,
                 temperature: 0.1,
-                max_tokens: 30,
+                max_tokens: 25,
             })
         });
 
         if (!response.ok) return null;
         const data = await response.json();
-        const content = data.choices?.[0]?.message?.content?.trim();
+        const trimmed = data.choices?.[0]?.message?.content?.trim();
 
-        const trimmed = content.trim();
-        if (!trimmed || trimmed.toUpperCase() === 'NO') {
-            return null;
-        }
+        if (!trimmed || trimmed.toUpperCase() === 'NO') return null;
         return trimmed;
     } catch (e) {
         console.error('generateSearchQuery Error:', e);
