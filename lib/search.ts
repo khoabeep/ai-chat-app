@@ -70,28 +70,35 @@ export async function generateSearchQuery(messages: any[]): Promise<string | nul
         ? latestMessage.content
         : JSON.stringify(latestMessage?.content ?? '');
 
-    // ── Keyword fast-path: skip LLM entirely ─────────────────────────────────
-    if (detectSearchByKeyword(latestText)) {
-        console.log('[Search] Keyword match — directly searching:', latestText);
-        return latestText.trim();
-    }
+    const needsSearch = detectSearchByKeyword(latestText);
 
-    // ── LLM fallback for ambiguous queries ────────────────────────────────────
+    // ── LLM: luôn generate proper English query để Serper trả kết quả tốt hơn ─
     try {
         const GROQ_API_KEY = process.env.GROQ_API_KEY;
-        if (!GROQ_API_KEY) return null;
+        if (!GROQ_API_KEY) return needsSearch ? latestText.trim() : null;
 
-        const systemPrompt = `You are a web search query generator.
+        // Nếu keyword đã xác định cần search → chỉ hỏi LLM format query đẹp
+        // Nếu không có keyword → hỏi LLM cả "có cần search không"
+        const systemPrompt = needsSearch
+            ? `Convert the user's question into a concise English Google search query (max 7 words).
+Output ONLY the search query, nothing else. No quotes.
+Examples:
+"Liverpool BXH UCL" -> Liverpool Champions League standings 2025-26
+"giá vàng hôm nay" -> gold price Vietnam today
+"thời tiết Hà Nội" -> Hanoi weather forecast today
+"BXH Premier League" -> Premier League standings 2025-26
+"man city kết quả" -> Man City latest match result 2026`
+            : `You are a web search query generator.
 Determine if the user's latest message requires a real-time web search.
 Search is needed for: news, current events, sports, prices, real-world facts that change over time.
 Search is NOT needed for: coding, math, explanations, opinions, general knowledge, greetings.
 
 If NO search needed: reply ONLY "NO".
-If search needed: reply with a concise Google search query (max 6 words). No quotes, no extra text.
+If search needed: reply with a concise English Google search query (max 7 words). No quotes, no extra text.
 Examples:
 "ai phát minh ra bóng đèn?" -> NO
-"tổng thống mỹ hiện tại?" -> tổng thống mỹ 2026
-"man utd BXH EPL" -> man utd standings premier league 2026
+"tổng thống mỹ hiện tại?" -> current US president 2026
+"man utd BXH EPL" -> Man United Premier League standings 2025-26
 "cảm ơn" -> NO`;
 
         const chatMessages = [
@@ -101,6 +108,9 @@ Examples:
                 content: typeof m.content === 'string' ? m.content : JSON.stringify(m.content)
             }))
         ];
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), needsSearch ? 3000 : 5000);
 
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
@@ -112,19 +122,22 @@ Examples:
                 model: 'llama-3.1-8b-instant',
                 messages: chatMessages,
                 temperature: 0.1,
-                max_tokens: 25,
-            })
+                max_tokens: 20,
+            }),
+            signal: controller.signal,
         });
+        clearTimeout(timeoutId);
 
-        if (!response.ok) return null;
+        if (!response.ok) return needsSearch ? latestText.trim() : null;
         const data = await response.json();
         const trimmed = data.choices?.[0]?.message?.content?.trim();
 
-        if (!trimmed || trimmed.toUpperCase() === 'NO') return null;
+        if (!trimmed || trimmed.toUpperCase() === 'NO') return needsSearch ? latestText.trim() : null;
         return trimmed;
     } catch (e) {
         console.error('generateSearchQuery Error:', e);
-        return null;
+        // Fallback: nếu keyword đã detect thì vẫn search với raw text
+        return needsSearch ? latestText.trim() : null;
     }
 }
 
@@ -155,8 +168,8 @@ export async function searchWeb(query: string): Promise<SearchResult> {
             },
             body: JSON.stringify({
                 q: query,
-                gl: 'vn',
-                hl: 'vi',
+                gl: 'us',
+                hl: 'en',
                 num: 5,
             }),
         });

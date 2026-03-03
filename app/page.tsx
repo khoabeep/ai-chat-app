@@ -294,7 +294,11 @@ export default function Home() {
             if (searchDone) {
                 try {
                     const b64 = resp.headers.get('X-Search-Sources') || '';
-                    if (b64) sources = JSON.parse(atob(b64));
+                    if (b64) {
+                        // atob() trả về Latin-1, phải dùng TextDecoder để đọc UTF-8 đúng
+                        const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+                        sources = JSON.parse(new TextDecoder('utf-8').decode(bytes));
+                    }
                 } catch { }
             }
 
