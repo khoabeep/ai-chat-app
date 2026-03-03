@@ -1341,6 +1341,22 @@
     white-space: nowrap;
 }
 
+/* ── Plan badge ────────────────────────────────────────────────────── */
+.planBadge {
+    font-size: 0.78rem;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid;
+    text-decoration: none;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+    font-weight: 600;
+    display: inline-block;
+    line-height: 1.4;
+}
+.planBadge:hover { opacity: 0.85; }
+
 /* ── File chip ─────────────────────────────────────────────────────── */
 .fileChip {
     display: inline-flex;

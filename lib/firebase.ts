@@ -80,3 +80,41 @@ export async function firestoreSet(docPath: string, fields: Record<string, strin
         body: JSON.stringify({ fields: firestoreFields }),
     });
 }
+
+// ── User Plan management (no auth — requires open Firestore rules for users/) ─
+export async function firestoreGetUserPlan(uid: string): Promise<'free' | 'pro'> {
+    try {
+        const url = `${FIRESTORE_URL}/users/${uid}`;
+        const res = await fetch(url);
+        if (!res.ok) return 'free';
+        const doc = await res.json();
+        const plan = doc?.fields?.plan?.stringValue;
+        return plan === 'pro' ? 'pro' : 'free';
+    } catch {
+        return 'free';
+    }
+}
+
+export async function firestoreCreateUserDoc(uid: string, email: string): Promise<void> {
+    const url = `${FIRESTORE_URL}/users/${uid}`;
+    await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            fields: {
+                plan: { stringValue: 'free' },
+                email: { stringValue: email },
+                createdAt: { stringValue: new Date().toISOString() },
+            },
+        }),
+    });
+}
+
+export async function firestoreSetUserPlan(uid: string, plan: string): Promise<void> {
+    const url = `${FIRESTORE_URL}/users/${uid}?updateMask.fieldPaths=plan`;
+    await fetch(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { plan: { stringValue: plan } } }),
+    });
+}

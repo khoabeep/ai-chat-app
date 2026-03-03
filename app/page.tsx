@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import Mermaid from '../components/Mermaid';
 import styles from './page.module.css';
+import { PLAN_CONFIG, canUseFeature, type Plan } from '@/lib/plans';
 
 // #3: Configure marked (no CDN)
 marked.setOptions({ breaks: true, gfm: true } as any);
@@ -118,6 +119,7 @@ export default function Home() {
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const [userEmail, setUserEmail] = useState<string | null>(null);
+    const [userPlan, setUserPlan] = useState<Plan>('guest');
     const [editingIdx, setEditingIdx] = useState<number | null>(null); // #9
     const [editText, setEditText] = useState('');
     const [isSummarizing, setIsSummarizing] = useState(false);          // #16
@@ -173,6 +175,8 @@ export default function Home() {
         const savedEmail = localStorage.getItem('user_email');
         if (savedEmail) {
             setUserEmail(savedEmail);
+            const savedPlan = localStorage.getItem('user_plan') as Plan | null;
+            setUserPlan(savedPlan === 'pro' ? 'pro' : 'free');
             // #2/#12: Load from Firestore
             fetch('/api/conversations').then(r => r.json()).then(data => {
                 if (data.conversations?.length > 0) {
@@ -524,13 +528,19 @@ export default function Home() {
                         </div>
                     </div>
                     <div className={styles.headerRight}>
-                        {!userEmail && (
-                            <a href="/login" className={styles.guestBadge} title="Đăng nhập để mở khóa tính năng">👤 Guest</a>
+                        {/* Plan badge */}
+                        {!userEmail ? (
+                            <a href="/login" className={styles.guestBadge} title="Đăng nhập để mở khóa tính năng">὆4 Guest • 15 tin/ngày</a>
+                        ) : (
+                            <a href="/pricing" className={styles.planBadge} style={{ background: PLAN_CONFIG[userPlan].bgColor, color: PLAN_CONFIG[userPlan].color, borderColor: PLAN_CONFIG[userPlan].color + '50' }} title="Xem gói cước">
+                                {PLAN_CONFIG[userPlan].badge}
+                                {userPlan === 'free' && <span style={{ opacity: 0.7, marginLeft: 4, fontSize: '0.72rem' }}>↑ Pro</span>}
+                            </a>
                         )}
-                        <button className={`${styles.iconBtn} ${isDebateMode ? styles.active : ''} ${!userEmail ? styles.locked : ''}`}
-                            onClick={() => userEmail ? setIsDebateMode(p => !p) : window.location.href = '/login'}
-                            title={userEmail ? 'Chế độ tranh luận' : '🔒 Đăng nhập để dùng Debate'}>
-                            <Scale size={15} /><span className={styles.labelText}> Debate{!userEmail && ' 🔒'}</span>
+                        <button className={`${styles.iconBtn} ${isDebateMode ? styles.active : ''} ${!canUseFeature(userPlan, 'debate') ? styles.locked : ''}`}
+                            onClick={() => canUseFeature(userPlan, 'debate') ? setIsDebateMode(p => !p) : window.location.href = '/login'}
+                            title={canUseFeature(userPlan, 'debate') ? 'Chế độ tranh luận' : 'ὑ2 Đăng nhập để dùng Debate'}>
+                            <Scale size={15} /><span className={styles.labelText}> Debate{!canUseFeature(userPlan, 'debate') && ' ὑ2'}</span>
                         </button>
                         <select className={styles.levelSelect} value={level} onChange={e => setLevel(e.target.value as ExpertiseLevel)}>
                             <option value="Newbie">Đơn giản</option>
@@ -538,17 +548,24 @@ export default function Home() {
                             <option value="Expert">Chuyên sâu</option>
                         </select>
                         <select className={styles.modelSelect}
-                            value={userEmail ? model : 'llama-3.3-70b-versatile'}
-                            onChange={e => { if (userEmail) setModel(e.target.value as ModelId); else window.location.href = '/login'; }}
-                            style={!userEmail ? { opacity: 0.5, cursor: 'not-allowed' } : {}}>
+                            value={model}
+                            onChange={e => {
+                                const val = e.target.value as ModelId;
+                                if (val === 'meta-llama/llama-4-scout-17b-16e-instruct' && !canUseFeature(userPlan, 'visionModel')) { window.location.href = '/pricing'; return; }
+                                if (val === 'mixtral-8x7b-32768' && !canUseFeature(userPlan, 'turboModel')) { window.location.href = '/login'; return; }
+                                setModel(val);
+                            }}>
                             <option value="llama-3.3-70b-versatile">KhoaAI Standard</option>
-                            {userEmail && <option value="mixtral-8x7b-32768">KhoaAI Turbo</option>}
-                            {userEmail && <option value="meta-llama/llama-4-scout-17b-16e-instruct">KhoaAI Vision 🔓</option>}
-                            {!userEmail && <option disabled>⭐ Đăng nhập để xem thêm...</option>}
+                            <option value="mixtral-8x7b-32768" disabled={!canUseFeature(userPlan, 'turboModel')}>
+                                KhoaAI Turbo{!canUseFeature(userPlan, 'turboModel') ? ' 🔒' : ''}
+                            </option>
+                            <option value="meta-llama/llama-4-scout-17b-16e-instruct" disabled={!canUseFeature(userPlan, 'visionModel')}>
+                                KhoaAI Vision{!canUseFeature(userPlan, 'visionModel') ? ' ⭐ Pro' : ''}
+                            </option>
                         </select>
                         <div className={styles.tempControl}
-                            title={userEmail ? `Độ sáng tạo: ${temperature}` : '🔒 Đăng nhập để điều chỉnh'}
-                            style={!userEmail ? { opacity: 0.4, pointerEvents: 'none' } : {}}>
+                            title={canUseFeature(userPlan, 'temperature') ? `Độ sáng tạo: ${temperature}` : '🔒 Đăng nhập để điều chỉnh'}
+                            style={!canUseFeature(userPlan, 'temperature') ? { opacity: 0.4, pointerEvents: 'none' } : {}}>
                             <Thermometer size={14} />
                             <input type="range" className={styles.tempSlider} min={0.1} max={1.0} step={0.1}
                                 value={temperature} onChange={e => handleTempChange(parseFloat(e.target.value))} disabled={!userEmail} />
@@ -565,9 +582,9 @@ export default function Home() {
                             </button>
                         )}
                         <button className={styles.iconBtn}
-                            onClick={() => userEmail ? exportChat() : window.location.href = '/login'}
-                            title={userEmail ? 'Xuất chat' : '🔒 Đăng nhập để xuất chat'}
-                            style={!userEmail ? { opacity: 0.45 } : {}}>
+                            onClick={() => canUseFeature(userPlan, 'export') ? exportChat() : window.location.href = '/login'}
+                            title={canUseFeature(userPlan, 'export') ? 'Xuất chat' : 'ὑ2 Đăng nhập để xuất chat'}
+                            style={!canUseFeature(userPlan, 'export') ? { opacity: 0.45 } : {}}>
                             <Download size={15} /><span className={styles.labelText}> Xuất</span>
                         </button>
                         <button className={styles.iconBtn} onClick={toggleDark} title="Đổi giao diện">
@@ -582,6 +599,7 @@ export default function Home() {
                         <button className={styles.iconBtn} onClick={async () => {
                             await fetch('/api/auth', { method: 'DELETE' });
                             localStorage.removeItem('user_email');
+                            localStorage.removeItem('user_plan');
                             window.location.href = '/login';
                         }} title="Đăng xuất" style={{ color: '#ef4444', borderColor: '#fca5a5' }}>
                             <LogOut size={15} /><span className={styles.labelText}> Thoát</span>
@@ -737,18 +755,23 @@ export default function Home() {
                             onKeyDown={handleKeyDown} placeholder="Nhắn tin với AI... (Shift+Enter để xuống dòng)"
                             className={styles.textInput} rows={1} disabled={isLoading} maxLength={MAX_INPUT_LENGTH} />
                         <div className={styles.inputActions}>
-                            {/* #15: Accept PDF */}
-                            <input type="file" ref={fileInputRef} accept="image/*,.txt,.md,.csv,.pdf" onChange={handleFileAttach} style={{ display: 'none' }} />
+                            {/* #15: Accept PDF for Pro, images+files for Free+ */}
+                            <input type="file" ref={fileInputRef}
+                                accept={canUseFeature(userPlan, 'pdfUpload') ? 'image/*,.txt,.md,.csv,.pdf' : 'image/*,.txt,.md,.csv'}
+                                onChange={handleFileAttach} style={{ display: 'none' }} />
                             <button className={styles.inputIconBtn}
-                                onClick={() => userEmail ? fileInputRef.current?.click() : window.location.href = '/login'}
-                                title={userEmail ? 'Đính kèm ảnh, file hoặc PDF' : '🔒 Đăng nhập để đính kèm'}
-                                disabled={isLoading} style={!userEmail ? { opacity: 0.4 } : {}}>
+                                onClick={() => {
+                                    if (!canUseFeature(userPlan, 'fileAttach')) { window.location.href = '/login'; return; }
+                                    fileInputRef.current?.click();
+                                }}
+                                title={!canUseFeature(userPlan, 'fileAttach') ? 'ὑ2 Đăng nhập để đính kèm' : canUseFeature(userPlan, 'pdfUpload') ? 'Đính kèm ảnh, file hoặc PDF' : 'Đính kèm ảnh hoặc file (PDF cần Pro ⭐)'}
+                                disabled={isLoading} style={!canUseFeature(userPlan, 'fileAttach') ? { opacity: 0.4 } : {}}>
                                 <Paperclip size={18} />
                             </button>
                             <button className={`${styles.inputIconBtn} ${isRecording ? styles.recording : ''}`}
-                                onClick={() => userEmail ? handleVoice() : window.location.href = '/login'}
-                                title={userEmail ? (isRecording ? 'Đang ghi âm...' : 'Nhập bằng giọng nói') : '🔒 Đăng nhập để dùng giọng nói'}
-                                disabled={isLoading} style={!userEmail ? { opacity: 0.4 } : {}}>
+                                onClick={() => canUseFeature(userPlan, 'voice') ? handleVoice() : window.location.href = '/login'}
+                                title={!canUseFeature(userPlan, 'voice') ? 'ὑ2 Đăng nhập để dùng giọng nói' : isRecording ? 'Đang ghi âm...' : 'Nhập bằng giọng nói'}
+                                disabled={isLoading} style={!canUseFeature(userPlan, 'voice') ? { opacity: 0.4 } : {}}>
                                 {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
                             </button>
                             <button className={styles.sendBtn} onClick={() => handleSend(input)}

@@ -25,7 +25,12 @@ export default function RegisterPage() {
                 body: JSON.stringify({ email, password }),
             });
             const data = await res.json();
-            if (res.ok) { router.push('/'); router.refresh(); }
+            if (res.ok) {
+                localStorage.setItem('user_email', data.email || email);
+                localStorage.setItem('user_plan', data.plan || 'free');
+                router.push('/');
+                router.refresh();
+            }
             else setError(data.error || 'Đăng ký thất bại');
         } catch { setError('Không thể kết nối máy chủ'); }
         finally { setLoading(false); }

@@ -24,6 +24,7 @@ export default function LoginPage() {
             const data = await res.json();
             if (res.ok) {
                 localStorage.setItem('user_email', data.email || email);
+                localStorage.setItem('user_plan', data.plan || 'free');
                 router.push('/');
                 router.refresh();
             }

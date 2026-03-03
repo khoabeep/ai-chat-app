@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { searchWeb } from '@/lib/search';
 import { cookies } from 'next/headers';
+import { PLAN_CONFIG, type Plan } from '@/lib/plans';
 
 const GROQ_API_KEY = process.env.GROQ_API_KEY!;
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -23,6 +24,26 @@ function checkRateLimit(ip: string): boolean {
     return true;
 }
 
+// ── Daily usage tracker per plan ──────────────────────────────────────────────
+const dailyUsageMap = new Map<string, number>();
+
+function getTodayKey(identifier: string): string {
+    return `${identifier}_${new Date().toISOString().slice(0, 10)}`;
+}
+
+function checkAndIncrementDaily(identifier: string, limit: number): boolean {
+    if (!isFinite(limit)) return true; // Pro = unlimited
+    const key = getTodayKey(identifier);
+    const current = dailyUsageMap.get(key) || 0;
+    if (current >= limit) return false;
+    dailyUsageMap.set(key, current + 1);
+    return true;
+}
+
+function getDailyUsed(identifier: string): number {
+    return dailyUsageMap.get(getTodayKey(identifier)) || 0;
+}
+
 export async function POST(req: Request) {
     // ── #4 Rate limiting ──────────────────────────────────────────────────────
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
@@ -33,11 +54,24 @@ export async function POST(req: Request) {
         });
     }
 
-    // ── #5 Auth guard ─────────────────────────────────────────────────────────
+    // ── Plan detection ────────────────────────────────────────────────────────
     const cookieStore = await cookies();
     const authToken = cookieStore.get('auth_token')?.value;
-    // Allow guests but limit features (handled client-side, server just logs)
-    const isAuthenticated = !!authToken;
+    const userUid = cookieStore.get('user_uid')?.value;
+    const userPlanRaw = cookieStore.get('user_plan')?.value;
+    const plan: Plan = authToken ? ((userPlanRaw === 'pro' ? 'pro' : 'free')) : 'guest';
+    const planCfg = PLAN_CONFIG[plan];
+
+    // ── Daily limit check ─────────────────────────────────────────────────────
+    const identifier = userUid || ip;
+    if (!checkAndIncrementDaily(identifier, planCfg.messagesPerDay)) {
+        const upgradeHint = plan === 'guest'
+            ? 'Đăng ký miễn phí để có 50 tin/ngày!'
+            : 'Nâng cấp lên Pro để nhắn không giới hạn!';
+        return new Response(JSON.stringify({
+            error: `Bạn đã dùng hết ${planCfg.messagesPerDay} tin nhắn hôm nay (${planCfg.label}). ${upgradeHint}`
+        }), { status: 429, headers: { 'Content-Type': 'application/json' } });
+    }
 
     try {
         const body = await req.json();
@@ -136,7 +170,16 @@ PERSONALIZATION: ${personaInstructions}`
         }
 
         // If there's an image, we MUST use the vision model
-        const actualModel = (imageBase64 && imageMime) ? 'meta-llama/llama-4-scout-17b-16e-instruct' : model;
+        // Block Vision model for non-Pro users
+        const allowVision = planCfg.features.visionModel;
+        const actualModel = (imageBase64 && imageMime)
+            ? (allowVision ? 'meta-llama/llama-4-scout-17b-16e-instruct' : model)
+            : model;
+
+        if (imageBase64 && imageMime && !allowVision) {
+            // Notify the user but still process as text-only
+            console.log('[Chat] Vision blocked for plan:', plan);
+        }
 
         if (imageBase64 && imageMime) {
             // Multimodal format for Groq Vision
