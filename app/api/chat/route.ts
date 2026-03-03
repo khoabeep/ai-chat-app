@@ -1,5 +1,7 @@
 export const dynamic = 'force-dynamic';
 
+import { searchWeb } from '@/lib/search';
+
 const GROQ_API_KEY = process.env.GROQ_API_KEY!;
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -28,7 +30,11 @@ export async function POST(req: Request) {
             personaInstructions = 'Giải thích rõ ràng, cân bằng giữa lý thuyết và thực hành.';
         }
 
-        const systemInstruction = isDebateMode
+        // Inject ngày/giờ thực tế vào system prompt
+        const now = new Date();
+        const currentDateTimeVN = now.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+        let systemInstruction = isDebateMode
             ? `You are a Multi-dimensional Expert Council.
 YOUR STRICT TASK: You MUST play TWO opposing roles to debate the user's prompt. You must NEVER give a standard single-viewpoint answer.
 - ROLE 1 (🟢 Pros): Defend the idea, highlight benefits, opportunities, and positive aspects.
@@ -42,7 +48,23 @@ PERSONALIZATION: ${personaInstructions}`
 - Dùng Markdown (tiêu đề, code block, bảng, danh sách...) khi phù hợp.
 - Nếu được yêu cầu vẽ sơ đồ, dùng code block \`\`\`mermaid.
 - CÁ NHÂN HÓA: ${personaInstructions}
-- Trả lời tiếng Việt trừ khi được yêu cầu ngôn ngữ khác.`;
+- Trả lời tiếng Việt trừ khi được yêu cầu ngôn ngữ khác.
+- THỜI GIAN HIỆN TẠI (Múi giờ Việt Nam): ${currentDateTimeVN}. Luôn dùng thông tin này khi người dùng hỏi về ngày/giờ hôm nay.`;
+
+        // Check xem có cần web search không
+        let searchData = '';
+        if (!isDebateMode) {
+            const { generateSearchQuery } = await import('@/lib/search');
+            const searchQuery = await generateSearchQuery(messages);
+            if (searchQuery) {
+                console.log("[Chat Route] LLM generated search query:", searchQuery);
+                searchData = await searchWeb(searchQuery);
+            }
+        }
+
+        if (searchData) {
+            systemInstruction += `\n\n[QUAN TRỌNG: DỮ LIỆU TÌM KIẾM THỰC TẾ]\nBạn vừa được cung cấp dữ liệu tìm kiếm mới nhất từ Google. DỰA VÀO ĐÂY ĐỂ TRẢ LỜI, KHÔNG ĐƯỢC BỊA ĐẶT THÔNG TIN.\n\nDỮ LIỆU TỪ GOOGLE:\n${searchData}`;
+        }
 
         // OpenAI/Groq messages format
         const chatMessages: any[] = [
